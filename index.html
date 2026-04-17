@@ -1,18 +1,19 @@
 <!doctype html>
 <!--
   Open House Prospects — Step 1 Shell
-  v0.4 — sticky topbar, add-lead stub
+  v0.5 — button system locked (Option B — Bordered clean)
   Reference: docs/DESIGN_SPEC.md
   Workflow: docs/DESIGN_PROTOCOL.md
 
-  Changes vs v0.3:
-  - Topbar is now sticky (position: sticky; top: 0) — stays visible during scroll
-  - Scroll-aware shadow: subtle 2-layer shadow fades in once window.scrollY > 4,
-    fades out at the top. Signals elevation, not separation.
-  - "+" button wired to data-action="add-lead" — placeholder alert for now,
-    real "Ajouter un prospect" form built after Step 2.
-  - Temporary scroll-test cards added to force overflow. Removed when Step 2
-    fills the content area with real Leads page UI.
+  Changes vs v0.4:
+  - Button system introduced: .btn with variants (--primary, --ghost, --danger),
+    sizes (--sm, --lg), and --block for full-width. See .btn CSS block in <style>.
+  - renderButton({ variant, size, icon, label, action, disabled, block }) primitive —
+    every generic button in the product routes through this.
+  - Icon-only buttons (topbar plus/bell) continue to use .icon-btn.
+  - Sidebar feedback-card CTA stays as-is (intentional exception, tuned to its card).
+  - Typography alignment: agency switcher name/city now uses same tokens as user
+    menu name/email (14px/12px, semibold/regular, primary/secondary).
 -->
 <html lang="fr">
 <head>
@@ -223,7 +224,7 @@
     line-height: 1.2;
   }
   .agency-name {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
     overflow: hidden;
@@ -232,7 +233,7 @@
   }
   .agency-city {
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 400;
     color: var(--text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -422,6 +423,9 @@
     margin-bottom: 12px;
     line-height: 1.4;
   }
+  /* Sidebar feedback-card CTA.
+     Intentionally NOT using .btn — this is tuned to the card's compact container.
+     Generic buttons (drawer, forms, filters) use the .btn system. */
   .sidebar-card-cta {
     display: block;
     width: 100%;
@@ -552,6 +556,94 @@
     border: 2px solid var(--frame);
     line-height: 1;
   }
+
+  /* ═══════════════════════════════════════════════════════════════
+     BUTTON SYSTEM (Option B — Bordered clean)
+     Locked in Step 1. Every clickable text-action in the product
+     uses these classes. Icon-only buttons use .icon-btn instead.
+     ═══════════════════════════════════════════════════════════════ */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 9px 14px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-body);
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: var(--shadow-xs);
+    transition: all 120ms ease;
+  }
+  .btn svg {
+    width: 15px;
+    height: 15px;
+    stroke-width: 1.75;
+    flex-shrink: 0;
+  }
+  .btn:hover {
+    border-color: var(--text-muted);
+    box-shadow: var(--shadow-sm);
+  }
+  .btn:active {
+    transform: translateY(0.5px);
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* Variants */
+  .btn--primary {
+    background: var(--text-primary);
+    color: #fff;
+    border-color: var(--text-primary);
+    font-weight: 600;
+  }
+  .btn--primary:hover {
+    background: #000;
+    border-color: #000;
+  }
+  .btn--ghost {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .btn--ghost:hover {
+    background: var(--surface-tint);
+    border-color: transparent;
+    box-shadow: none;
+  }
+  .btn--danger {
+    border-color: #F5BDBD;
+    color: #C63636;
+  }
+  .btn--danger:hover {
+    background: #FDE7E7;
+    border-color: #E89898;
+  }
+
+  /* Sizes */
+  .btn--sm {
+    padding: 6px 11px;
+    font-size: 12px;
+  }
+  .btn--sm svg { width: 13px; height: 13px; }
+  .btn--lg {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+  .btn--lg svg { width: 16px; height: 16px; }
+
+  /* Full-width (for drawer footers, mobile actions, forms) */
+  .btn--block { width: 100%; }
 
   /* Search */
   .search {
@@ -1157,6 +1249,35 @@ function renderAvatar(init, tone, size=28) {
   return `<div class="avatar" style="width:${size}px;height:${size}px;background:${tone};border-radius:50%;display:grid;place-items:center;color:#fff;font-size:${Math.max(10, Math.round(size * 0.38))}px;font-weight:600;flex-shrink:0;">${init}</div>`;
 }
 
+/**
+ * Button primitive. Every clickable text-action uses this.
+ * Icon-only buttons use `.icon-btn` directly (topbar plus/bell).
+ *
+ *   variant: "default" | "primary" | "ghost" | "danger"   (default: "default")
+ *   size:    "sm" | "md" | "lg"                           (default: "md")
+ *   block:   boolean — full-width                         (default: false)
+ *   icon:    SVG string (from icon.*()) placed before label
+ *   label:   button text
+ *   action:  data-action value to dispatch on click
+ *   disabled: boolean
+ *   extra:   additional class names (rare)
+ */
+function renderButton({ variant = "default", size = "md", block = false, icon = "", label = "", action = "", disabled = false, extra = "" } = {}) {
+  const classes = [
+    "btn",
+    variant !== "default" && `btn--${variant}`,
+    size !== "md" && `btn--${size}`,
+    block && "btn--block",
+    extra,
+  ].filter(Boolean).join(" ");
+  const attrs = [
+    `class="${classes}"`,
+    action ? `data-action="${action}"` : "",
+    disabled ? `disabled aria-disabled="true"` : "",
+  ].filter(Boolean).join(" ");
+  return `<button ${attrs}>${icon}${label ? `<span>${label}</span>` : ""}</button>`;
+}
+
 function renderAvatarStack(team, more) {
   // Kept for future uses (assignment dropdowns, agent cards). Not currently rendered in topbar.
   const avatars = team.map(m => renderAvatar(m.initials, m.tone)).join("");
@@ -1206,7 +1327,7 @@ function renderContent() {
             Sidebar + topbar en place. Page active : <code>${state.route}</code>. Le contenu de <strong>Leads</strong> arrive à l'étape 2.
           </div>
         </div>
-        <div class="empty-state-chip">v0.4</div>
+        <div class="empty-state-chip">v0.5</div>
       </div>
       ${renderScrollTestContent()}
     </main>
@@ -1216,7 +1337,27 @@ function renderContent() {
 function renderScrollTestContent() {
   // Temporary — removed when Step 2 adds real Leads content.
   // Exists only so we can evaluate the sticky topbar behavior during scroll.
-  const cards = Array.from({ length: 8 }, (_, i) => `
+  const buttonDemo = `
+    <div class="scroll-test-card">
+      <div class="scroll-test-card-title">Système de boutons · v0.5 (Option B)</div>
+      <div class="scroll-test-card-body" style="margin-bottom:16px;">
+        Aperçu du système verrouillé. Toutes les actions textuelles du produit passent par <code style="font-family:var(--font-mono);font-size:12px;background:var(--surface-tint);padding:1px 5px;border-radius:4px;">renderButton()</code>.
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        ${renderButton({ variant: "primary", label: "Envoyer template" })}
+        ${renderButton({ label: "Appeler" })}
+        ${renderButton({ variant: "ghost", label: "Annuler" })}
+        ${renderButton({ variant: "danger", label: "Supprimer" })}
+        ${renderButton({ variant: "primary", label: "Désactivé", disabled: true })}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+        ${renderButton({ variant: "primary", size: "sm", label: "Small" })}
+        ${renderButton({ variant: "primary", label: "Default" })}
+        ${renderButton({ variant: "primary", size: "lg", label: "Large" })}
+      </div>
+    </div>
+  `;
+  const cards = Array.from({ length: 6 }, (_, i) => `
     <div class="scroll-test-card">
       <div class="scroll-test-card-title">Carte ${i + 1} · test de défilement</div>
       <div class="scroll-test-card-body">
@@ -1224,7 +1365,7 @@ function renderScrollTestContent() {
       </div>
     </div>
   `).join("");
-  return `<div class="scroll-test">${cards}</div>`;
+  return `<div class="scroll-test">${buttonDemo}${cards}</div>`;
 }
 
 /* ───── Root render ───── */
