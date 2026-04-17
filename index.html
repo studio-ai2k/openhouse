@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   Open House Prospects — Step 2 Leads page (in progress)
-  v0.7.0-dev (Phase 2 of 4) — chip shows v0.7.0-p2 during development
+  v0.7.0-dev (Phase 3 of 4) — chip shows v0.7.0-p3 during development
   Reference: docs/DESIGN_SPEC.md
   Workflow: docs/DESIGN_PROTOCOL.md
 
@@ -9,53 +9,39 @@
   carries a -pN suffix so iPad reviews can tell which phase a push is from.
   Zip filename during phases: openhouse-prospects-phaseN.zip. Final: v0.7.0.
 
-  Phase 2 scope (Variation A on route "leads-a", shared primitives):
-  - New render primitives, all data-driven off state.agency.pipeline and
-    state.leads (they share the same primitives Phase 3 will reuse for
-    Variation B):
-      renderLeadsToggleA  — promoted tabs (icon + label + count pill,
-                            2px underline accent on active)
-      renderLeadsSearch   — in-page search input (topbar search is
-                            suppressed on Leads routes, see Phase 1)
-      renderPipelineBar   — horizontal stage cells with tinted bg + counts,
-                            clickable as shortcut to set the filter tab
-      renderFilterTabs    — Tous · [pipeline stages] · Perdu, each with
-                            counts, horizontal scroll on mobile
-      renderScoreChip     — Chaud / Tiède / Froid with colored dot + label
-      renderSourceIcon    — small colored square for ig/fb/web/email/manual
-      renderLeadCard      — richer click-to-open-drawer card with avatar,
-                            name, price, zone, source, score, status,
-                            verified, agent initials, date
-      renderLeadsEmptyState — "aucun vendeur" or "aucun résultat"
-  - Pure view-compute helper: computeLeadsView() returns filtered leads +
-    counts per tab + pipeline for current type, single source of truth for
-    everything the Leads page renders.
-  - New data-actions: set-lead-type (also resets filterTab to "all"),
-    set-filter-tab (used by both filter tabs and pipeline bar cells).
-  - New delegated input listener for filter-search — mirrors the existing
-    click delegation pattern.
-  - New icons: key (Vendeurs affordance in the toggle).
-  - Counts discipline: toggle type counts = raw totals (not affected by
-    search), tab counts = type + search filtered (not affected by active
-    tab), visible leads = all three filters applied. Click a tab or a
-    pipeline cell → only the visible set changes; counts stay stable.
+  Phase 3 scope (Variation B on route "leads-b"):
+  - Variation B reuses every Phase 2 primitive — computeLeadsView,
+    renderPipelineBar, renderFilterTabs, renderLeadsControlsRow,
+    renderLeadsSearch, renderLeadCard, etc. The ONLY B-specific pieces
+    are the toggle treatment and the type-accent surface cues.
+  - New renderers:
+      renderLeadsToggleB   — compact segmented pill with icons (vs A's
+                             promoted tabs). No counts inside the pill;
+                             the count moves to the context chip beside it.
+      renderLeadsContextChip — colored pill reading "10 acquéreurs actifs"
+                             (or "3 vendeurs actifs"). Grammar adjusts for
+                             plural. Uses the type-accent color family.
+  - Type-accent surface:
+      4px top-edge strip at the very top of the Leads · B page, colored
+      by active type — vibrant accent-blue for Acquéreurs, accent-amber
+      for Vendeurs.
+      The toggle pill's active option picks up the same type-accent color
+      for its text and icon.
+      The context chip uses the soft variant for bg + deep variant for fg.
+  - Accent plumbing via CSS custom properties: the B page root gets a
+    "mode-buyer" or "mode-seller" class which sets --type-accent /
+    --type-accent-bg / --type-accent-strong. Every B-specific rule reads
+    from these, so flipping the toggle recolors the surface in one place.
+  - set-lead-type already resets filterTab to "all" (Phase 2 behavior) —
+    no handler changes needed for Phase 3.
 
-  Phase 2 scope (what route "leads-b" still shows):
-  - Route "leads-b" continues to render the Phase 1 "fondations en place"
-    placeholder with the variant tag. Phase 3 replaces it with Variation B
-    (compact tinted toggle).
+  Both routes are now live. User picks the winner after living with A
+  and B on iPad.
 
-  What Phase 2 does NOT include (by design):
-  - The real leads table is Step 2 Layer 2 — we're still on cards through
-    Phase 4. Phase 4 picks the winning variation, then Layer 2 builds the
-    table on top of the chosen toggle.
-  - Drawer tab bodies (Infos / Qualification / Activité / Notes) remain
-    placeholders — that's Step 3.
-
-  Phase 3: Variation B on route "leads-b" — same primitives, different
-  toggle (compact segmented pill with type-accent color).
-  Phase 4: delete losing variant, rename winner's route back to "leads",
-  resolve mono-font + feedback-card decisions, drop the "-pN" chip suffix.
+  Phase 4 (after winner picked): delete losing variant's renderer + CSS,
+  rename winner's route back to "leads", collapse the nav to a single
+  Leads entry, resolve mono-font + feedback-card open decisions, drop
+  the "-pN" suffix, ship as v0.7.0.
 -->
 <html lang="fr">
 <head>
@@ -1069,7 +1055,7 @@
   .drawer-footer .btn { flex: 1; }
 
   /* ═══════════════════════════════════════════════════════════════
-     LEADS PAGE — v0.7.0-p2 controls + card list
+     LEADS PAGE — v0.7.0-p3 controls + card list (Variation A + B)
      Base rules only. Mobile-specific rules live in the @media block
      at the bottom of this stylesheet (source-order cascade — see §5
      architecture notes in HANDOFF).
@@ -1465,6 +1451,104 @@
     max-width: 440px;
     margin: 0 auto;
     line-height: 1.55;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     VARIATION B — compact tinted toggle + type-accent surface cues.
+     Everything type-aware reads from --type-accent / --type-accent-bg /
+     --type-accent-strong, which are set on the .leads-b mode-* root
+     class. Flipping the toggle re-palettes the whole surface in one
+     place. Shared primitives (pipeline-bar, filter-tabs, lead-card)
+     stay neutral — they're rendered identically in A and B.
+     ═══════════════════════════════════════════════════════════════ */
+  .leads-b {
+    --type-accent:        var(--accent-blue);
+    --type-accent-bg:     var(--blue-soft);
+    --type-accent-strong: var(--accent-blue);
+  }
+  .leads-b.mode-seller {
+    --type-accent:        #8C5A08;              /* amber-deep (readable) */
+    --type-accent-bg:     var(--amber-soft);
+    --type-accent-strong: var(--accent-amber);  /* vibrant for the strip */
+  }
+
+  /* 4px band at the very top. Visual commitment to "this surface is
+     type-aware" — picks up the vibrant accent, not the text accent. */
+  .leads-b .leads-topedge {
+    height: 4px;
+    background: var(--type-accent-strong);
+    border-radius: 2px;
+    margin-bottom: 14px;
+  }
+
+  /* Toggle row: compact pill + context chip on the same line. */
+  .leads-b .leads-toggle-b-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  /* Compact segmented pill toggle. */
+  .leads-toggle-b {
+    display: inline-flex;
+    background: var(--surface-tint);
+    border-radius: var(--r-pill);
+    padding: 3px;
+    gap: 2px;
+  }
+  .leads-toggle-b-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 14px;
+    background: transparent;
+    border: 0;
+    border-radius: var(--r-pill);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    letter-spacing: -0.1px;
+    white-space: nowrap;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .leads-toggle-b-tab svg { width: 14px; height: 14px; opacity: 0.7; }
+  .leads-toggle-b-tab:hover:not([aria-selected="true"]) { color: var(--text-primary); }
+  .leads-b .leads-toggle-b-tab[aria-selected="true"] {
+    background: var(--panel);
+    color: var(--type-accent);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
+  .leads-b .leads-toggle-b-tab[aria-selected="true"] svg {
+    opacity: 1;
+    color: var(--type-accent);
+  }
+
+  /* Context chip: pill echoing the active type's palette.
+     Sits next to the toggle; carries the raw type count in words. */
+  .leads-context-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: var(--r-pill);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: -0.1px;
+    white-space: nowrap;
+  }
+  .leads-context-chip svg {
+    width: 12px;
+    height: 12px;
+    stroke-width: 2;
+    flex-shrink: 0;
+  }
+  .leads-b .leads-context-chip {
+    background: var(--type-accent-bg);
+    color: var(--type-accent);
   }
   /* ═══════════════════════════════════════════════════════════════
      RESPONSIVE (placed last so these override all base rules
@@ -2128,6 +2212,49 @@ function renderLeadsToggleA(typeCounts) {
   `;
 }
 
+/* Variation B toggle: compact segmented pill with icons inside. No counts
+   in the pill itself — those move to renderLeadsContextChip next to it.
+   Active option's text + icon recolor via --type-accent (set on the
+   .leads-b parent's mode-buyer / mode-seller class, so the whole surface
+   re-palettes in one place when the toggle flips). */
+function renderLeadsToggleB() {
+  const opt = (typeKey, iconKey, label) => {
+    const active = state.leadType === typeKey;
+    return `
+      <button class="leads-toggle-b-tab"
+              role="tab"
+              aria-selected="${active}"
+              data-action="set-lead-type"
+              data-type="${typeKey}">
+        ${icon[iconKey]()}
+        <span>${label}</span>
+      </button>
+    `;
+  };
+  return `
+    <div class="leads-toggle-b" role="tablist" aria-label="Type de lead">
+      ${opt("buyer",  "home", "Acquéreurs")}
+      ${opt("seller", "key",  "Vendeurs")}
+    </div>
+  `;
+}
+
+/* Context chip (Variation B only): shows raw active-type count in words.
+   Lives next to the toggle so the type-aware signal reinforces the toggle
+   rather than fighting it. Grammar handles singular/plural for count. */
+function renderLeadsContextChip(typeKey, count) {
+  const noun    = typeKey === "buyer" ? "acquéreur" : "vendeur";
+  const plural  = count === 1 ? "" : "s";
+  const adj     = count === 1 ? "actif" : "actifs";
+  const iconKey = typeKey === "buyer" ? "home" : "key";
+  return `
+    <span class="leads-context-chip" aria-label="${count} ${noun}${plural} ${adj}">
+      ${icon[iconKey]()}
+      <span>${count} ${noun}${plural} ${adj}</span>
+    </span>
+  `;
+}
+
 /* In-page search. Distinct from topbar search (topbar is hidden on Leads
    routes via body[data-route=...] CSS). Input events delegated on document. */
 function renderLeadsSearch() {
@@ -2324,19 +2451,27 @@ function renderLeadsContentA() {
   `;
 }
 
-/* Variation B placeholder (still Phase 1 shape with chip bumped). */
+/* Variation B: compact tinted toggle + context chip, with a 4px type-accent
+   top-edge band above. Wrapped in a .leads-b root that carries a mode-buyer
+   or mode-seller class — every type-accent CSS rule reads from custom
+   properties set by that class, so the whole surface re-palettes in one
+   place when the user flips the toggle. Everything below the toggle row is
+   identical to Variation A (same primitives, same data). */
 function renderLeadsContentB() {
-  const buyerCount  = state.leads.filter(l => l.type === "buyer").length;
-  const sellerCount = state.leads.filter(l => l.type === "seller").length;
+  const view      = computeLeadsView();
+  const modeClass = `mode-${state.leadType}`;
+  const typeCount = view.counts.typeCounts[state.leadType];
   return `
-    <div class="empty-state">
-      <div class="empty-state-left">
-        <div class="empty-state-title">Leads · B — en attente de Phase 3</div>
-        <div class="empty-state-body">
-          Route <code>${state.route}</code>. La variante B (toggle compact teinté par type) arrive en Phase 3 et réutilisera les primitives construites en Phase 2 sur Leads · A. Données en place : ${buyerCount} acquéreurs + ${sellerCount} vendeurs.
-        </div>
+    <div class="leads-b ${modeClass}">
+      <div class="leads-topedge" aria-hidden="true"></div>
+      <div class="leads-toggle-b-row">
+        ${renderLeadsToggleB()}
+        ${renderLeadsContextChip(state.leadType, typeCount)}
       </div>
-      <div class="empty-state-chip">v0.7.0-p2</div>
+      ${renderLeadsControlsRow(view.visible.length)}
+      ${renderPipelineBar(view.pipeline, view.counts.stageCounts, state.filterTab)}
+      ${renderFilterTabs(view.pipeline, view.counts, state.filterTab)}
+      ${renderLeadsList(view)}
     </div>
   `;
 }
@@ -2371,7 +2506,7 @@ function renderRouteComingSoon() {
         <div class="empty-state-title">${title}</div>
         <div class="empty-state-body">Page à construire. Cette section sera implémentée après l'étape 2 (Leads) et l'étape 3 (tiroir).</div>
       </div>
-      <div class="empty-state-chip">v0.7.0-p2</div>
+      <div class="empty-state-chip">v0.7.0-p3</div>
     </div>
   `;
 }
