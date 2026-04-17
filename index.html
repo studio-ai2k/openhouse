@@ -1,67 +1,79 @@
 <!doctype html>
 <!--
-  Open House Prospects — Step 2 Layer 2 SHIPPED
-  v0.8.0 — Leads table in a contained Prodex-style card
-  Reference: docs/DESIGN_SPEC.md + reference shot of Prodex Top Products card
+  Open House Prospects — v0.9.0
+  Step 2 Layer 2+ — Select mode + column sort shipped; table header stripped
+  Reference: docs/DESIGN_SPEC.md + Prodex Top Products card
   Workflow: docs/DESIGN_PROTOCOL.md
 
-  v0.8.0 replaces the Layer 1 card stack with a sortable-ready table
-  wrapped in a single contained card. The naked pipeline bar + filter
-  tabs band is replaced by a row of 6 Prodex-style stage KPI cards that
-  serve BOTH as visualization (icon badge + label + count) AND as the
-  primary filter — clicking a stage card filters the table to that
-  pipeline stage; clicking the active card again deselects back to "all".
+  v0.9.0 is a polish + capability push on the Layer 2 table. Four user
+  calls drove the changes:
 
-  Key structural moves from Layer 1:
-  - Removed: renderPipelineBar, renderFilterTabs, renderLeadsControlsRow,
-    renderLeadCard, renderLeadsList. Also removed the .pipeline-cell*,
-    .filter-tab*, .lead-card*, .status-pill, .source-icon*, .lead-verified,
-    .lead-agent CSS (~220 lines).
-  - Added: renderStageCards (the 6-card Prodex row), renderLeadsTable
-    (contained card with header + column labels + rows), renderLeadRow
-    (single grid row, click-to-open-drawer). Added 7 new icons: inbox,
-    target, calendar, fileText, trophy, sort, filter.
-  - "Mis à jour il y a 2 min" meta moves to the toggle row (right-aligned).
-  - In-page search moves into the table card header, alongside Sort and
-    Filter buttons (Prodex Top Products pattern).
-  - Status and Source columns are dropped from the table row per §14
-    design decision — Status is already loud (stage cards up top), Source
-    rarely needs at-a-glance access (lives in the drawer instead).
+    1. Drop the icon beside "Liste des leads" — the title is unambiguous,
+       the icon was visual noise. Removed from renderLeadsTable + CSS.
+    2. Drop the "Mis à jour il y a 2 min / N leads filtrés par…" sub-meta
+       line. The stage card row up top already carries both signals
+       (active-card highlight = what's filtered, updated-time = toggle row).
+    3. Drop the Trier button. Column headers are now clickable and cycle
+       desc → asc → no-sort. Double-chevron indicator when idle, single
+       arrow when active. One column sortable at a time.
+    4. Add a Sélectionner button for bulk actions. Click → enter select
+       mode: leftmost checkbox column appears, header gets a "select all
+       visible" checkbox, rows get per-row checkboxes. Row click toggles
+       selection instead of opening drawer. When selectedLeadIds > 0, a
+       bulk action bar pins to the bottom of the card with Assigner /
+       Changer statut / Archiver / Supprimer buttons.
 
-  Stage cards — default vs active:
-  - Default: white bg · soft border · colored icon in stage-tint badge ·
-    muted label · primary-text count.
-  - Active:  stage-tint bg · transparent border · white icon badge ·
-    stage-fg label · stage-deep (darker) count. Re-palettes on click.
+  Select mode semantics:
+  - Selection PERSISTS across filter changes and type flip. "I picked
+    these to act on" beats "these happen to be visible right now". The
+    count on the bulk bar may exceed visible-row count — that's fine.
+  - "Select all visible" only adds currently-visible rows to the pick
+    set; existing off-screen picks stay picked.
+  - Clicking the active Sélectionner button (now labelled Annuler) exits
+    select mode AND clears the pick set.
+  - The X on the bulk bar clears the pick set but STAYS in select mode.
+  - ESC priority: drawer → select mode → user menu → agency switcher →
+    sidebar.
 
-  stageColors() now returns { bg, fg, deep } — the deep tone is the
-  readable dark variant used by the active-card label/count. Existing
-  callers (drawer header, score pill) destructure bg + fg only — the
-  third value is ignored, no breakage.
+  Bulk actions (Assigner, Changer statut, Archiver, Supprimer) are all
+  stubbed with alerts. Popovers and confirms ship as a follow-up, but the
+  mode + selection UX is live and real.
 
-  Sort and Filter buttons:
-  - Sort = stub. Clicking shows an alert for now. Column-header sort
-    toggles and the popover UI ship as a follow-up to Layer 2.
-  - Filter = stub. When the stage-card filter is active, the button
-    carries a "1" count badge so the user can see a filter is applied.
-    The popover will handle Score / Source / Agent / Verified / Date
-    range / show-Perdu refinements — none are buildable until the popover
-    primitive lands.
+  Sort implementation:
+  - state.leadsSort = null | { column, direction }.
+  - leadComparator(column) returns a (a, b) => number comparator per column.
+  - computeLeadsView applies sort LAST, after filter + search.
+  - Numeric fields parse digits out of formatted strings (leadPriceNumeric).
+  - Date is stored as ISO "2026-04-09" now (was "09 avr. 2026" in v0.8.0);
+    formatLeadDate(iso) renders the French short form for display.
+  - Score orders hot(3) > warm(2) > cold(1). Agent sorts by name with
+    empty string for unassigned.
 
-  What v0.8.0 does NOT include (deferred):
-  - Column sorting (headers are static labels, no click handlers yet)
-  - Bulk select via row checkboxes — deferred until the bulk action bar
-    ships. state.selectedLeadIds still unplanned.
-  - Filter popover content — button stub only.
-  - Sort popover content — button stub only.
-  - Mobile card-fallback for the table (current mobile layout relies on
-    flex-wrap in the table header + tight grid gaps; ~600px and below
-    may need a proper card fallback — evaluate on iPad landscape first).
+  State adds (v0.9.0):
+  - leadsSort:       null | { column, direction }
+  - selectionMode:   boolean
+  - selectedLeadIds: number[]
 
-  Next steps (HANDOFF §7):
-  - Step 3: drawer bodies (Infos / Qualification / Activité / Notes forms)
-  - Follow-up polish: Sort popover, Filter popover, bulk select, column
-    sorting.
+  New click handlers: sort-column, toggle-select-mode, toggle-select-all,
+  clear-selection, bulk-assign, bulk-change-status, bulk-archive, bulk-delete.
+  The old open-drawer action is kept as a legacy alias; new rows emit
+  row-click which checks selectionMode and dispatches accordingly.
+
+  New icons: arrowUp, arrowDown, chevronsUpDown, trash, userCheck.
+
+  Deleted from v0.8.0:
+  - .leads-table-header-icon + .leads-table-meta CSS
+  - renderLeadsTable's icon + meta-line JSX
+  - The Trier button (data-action open-sort-panel deleted along with the
+    stub handler — it was only wired to an alert).
+  - Static column header labels (now rendered through renderColumnHeader).
+
+  What v0.9.0 does NOT include (deferred):
+  - Real popovers for Assigner / Changer statut / Filtrer (all stubs)
+  - A confirmation modal for Supprimer
+  - Indeterminate visual on the "select all" header checkbox when only
+    some visible rows are picked (skipped for MVP — checked or unchecked)
+  - Step 3 drawer bodies (Infos / Qualification / Activité / Notes)
 -->
 <html lang="fr">
 <head>
@@ -1250,38 +1262,15 @@
     flex-wrap: wrap;
   }
   .leads-table-header-title {
-    display: flex;
-    align-items: center;
-    gap: 11px;
     flex: 1;
     min-width: 0;
   }
-  .leads-table-header-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--type-accent-bg);
-    color: var(--type-accent);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .leads-table-header-icon svg { width: 17px; height: 17px; }
-  .leads-table-header-text { min-width: 0; }
   .leads-table-title {
     display: block;
     font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
     letter-spacing: -0.15px;
-  }
-  .leads-table-meta {
-    display: block;
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 1px;
-    letter-spacing: -0.05px;
   }
   .leads-table-header-actions {
     display: flex;
@@ -1312,6 +1301,18 @@
     border-color: var(--border-strong);
   }
   .leads-table-btn svg { width: 14px; height: 14px; stroke-width: 2; }
+  .leads-table-btn--active {
+    background: var(--text-primary);
+    border-color: var(--text-primary);
+    color: var(--panel);
+    box-shadow: none;
+  }
+  .leads-table-btn--active:hover {
+    background: var(--text-primary);
+    border-color: var(--text-primary);
+    color: var(--panel);
+    opacity: 0.92;
+  }
   .leads-table-btn-badge {
     display: inline-flex;
     align-items: center;
@@ -1343,6 +1344,19 @@
     gap: 14px;
     align-items: center;
   }
+  /* Select-mode variant: prepend a 44px checkbox column. Applied via
+     --selectable modifier set on the head and body when state.selectionMode. */
+  .leads-table-head--selectable,
+  .leads-table-body--selectable .leads-row {
+    grid-template-columns:
+      44px                  /* Checkbox (fixed width)        */
+      minmax(180px, 2.2fr)
+      minmax(100px, 1fr)
+      minmax(140px, 1.4fr)
+      minmax(90px,  0.9fr)
+      minmax(70px,  0.8fr)
+      minmax(72px,  0.9fr);
+  }
   .leads-table-head {
     padding: 12px 22px 10px;
     font-size: 11px;
@@ -1361,7 +1375,169 @@
   }
   .leads-row:hover { background: var(--row-hover); }
   .leads-row[data-selected="true"] { background: #F2F5FF; }
+  .leads-row--picked { background: #EEF2FF; }
+  .leads-row--picked:hover { background: #E0E7FF; }
   .leads-row:last-child { border-bottom: 0; }
+
+  /* Sortable column header — clickable. Muted double-chevron when idle,
+     coloured arrow when active. Reset button reset + hover affordance. */
+  .leads-col-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    text-transform: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    user-select: none;
+    text-align: left;
+  }
+  .leads-col-header:hover { color: var(--text-primary); }
+  .leads-col-header[aria-sort="ascending"],
+  .leads-col-header[aria-sort="descending"] { color: var(--text-primary); }
+  .leads-col-sort {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .leads-col-sort svg {
+    width: 12px;
+    height: 12px;
+    stroke-width: 2;
+  }
+  .leads-col-sort--idle { opacity: 0.45; }
+  .leads-col-sort--active {
+    color: var(--accent-blue);
+    opacity: 1;
+  }
+
+  /* Checkbox column + checkbox cell visual. The input itself isn't rendered —
+     the row click is the toggle, and we draw a styled span with an optional
+     check icon inside. Keeps the tap-target large and the visual crisp. */
+  .leads-col--check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .leads-col-header--check {
+    padding: 0;                /* override cell padding, center the box */
+    justify-content: center;
+    cursor: pointer;
+  }
+  .leads-checkbox {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    border: 1.5px solid var(--border-strong);
+    background: var(--panel);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--panel);
+    transition: background 100ms ease, border-color 100ms ease;
+  }
+  .leads-checkbox svg { width: 12px; height: 12px; stroke-width: 3; }
+  .leads-checkbox--on {
+    background: var(--accent-blue);
+    border-color: var(--accent-blue);
+    color: var(--panel);
+  }
+  .leads-col-header--check:hover .leads-checkbox:not(.leads-checkbox--on) {
+    border-color: var(--accent-blue);
+  }
+
+  /* Bulk action bar: lives inside the table card at the bottom. When
+     selection > 0, it enters from below. Sticky to the card's bottom edge
+     during scroll — sits visually on top of the last row without a gap. */
+  .leads-bulk-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 22px;
+    background: var(--panel);
+    border-top: 1px solid var(--border-subtle);
+    box-shadow: 0 -6px 18px -12px rgba(15, 23, 42, 0.18);
+  }
+  .leads-bulk-bar-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    letter-spacing: -0.05px;
+  }
+  .leads-bulk-bar-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    flex-shrink: 0;
+  }
+  .leads-bulk-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    flex-wrap: wrap;
+  }
+  .leads-bulk-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 11px;
+    background: var(--panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-sm);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-primary);
+    cursor: pointer;
+    letter-spacing: -0.05px;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  }
+  .leads-bulk-btn:hover {
+    background: var(--row-hover);
+    border-color: var(--border-strong);
+  }
+  .leads-bulk-btn svg { width: 13px; height: 13px; stroke-width: 2; }
+  .leads-bulk-btn--danger { color: #B91C1C; }
+  .leads-bulk-btn--danger:hover {
+    background: #FEE2E2;
+    border-color: #F5A5A5;
+    color: #7F1D1D;
+  }
+  .leads-bulk-bar-clear {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: transparent;
+    border: 0;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .leads-bulk-bar-clear:hover {
+    background: var(--row-hover);
+    color: var(--text-primary);
+  }
+  .leads-bulk-bar-clear svg { width: 16px; height: 16px; stroke-width: 2; }
 
   .leads-col { min-width: 0; }
   .leads-col--nom {
@@ -1582,6 +1758,16 @@
     }
     .leads-updated-meta { flex: 1 1 100%; margin-left: 0; }
 
+    /* Mobile bulk bar: wrap; drop count-text on tight widths via min-widths */
+    .leads-bulk-bar {
+      padding: 10px 16px;
+      flex-wrap: wrap;
+    }
+    .leads-bulk-bar-actions { gap: 5px; }
+    .leads-bulk-btn { padding: 0 9px; font-size: 11px; }
+    .leads-bulk-btn span { display: none; }  /* icons only on mobile */
+    .leads-bulk-btn { height: 30px; width: 36px; justify-content: center; padding: 0; }
+
     .app-shell { grid-template-columns: 1fr; }
     .sidebar {
       position: fixed;
@@ -1727,6 +1913,15 @@ const state = {
   leadType:    "buyer",      // "buyer" | "seller" — drives toggle + pipeline lookup
   filterTab:   "all",        // "all" | pipeline stage id | "lost"
   leadsSearch: "",           // page-scoped search query
+  // Column sort (v0.9.0). null = default order (by id). When set: { column, direction }.
+  // column ∈ "name" | "budget" | "zone" | "score" | "agent" | "date"
+  // direction ∈ "asc" | "desc"
+  leadsSort: null,
+  // Bulk-select mode (v0.9.0). selectionMode toggles the checkbox column on.
+  // selectedLeadIds persists across filter changes — the intent is "act on these",
+  // not "these that happen to be visible". Exit mode via Annuler or ESC.
+  selectionMode: false,
+  selectedLeadIds: [],
 
   // Team roster. IDs used by lead.assignedAgentId.
   team: [
@@ -1745,18 +1940,18 @@ const state = {
   // agency.pipeline[type]) or "lost" for terminal-fail leads. score / source are
   // closed enums. assignedAgentId references state.team; null = unassigned.
   leads: [
-    { id: 1,  type: "buyer",  initials: "ML", tone: "#A855F7", name: "Marie Lefèvre",       email: "marie.lefevre@gmail.com", phone: "+33 6 78 90 12 34", phoneVerified: true,  budget: "450 000 €",   zone: "Paris 16e",         timeline: "1–3 mois",  projectType: "Résidence principale",     status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e",   createdAt: "09 avr. 2026", notes: "Recherche 3 pièces avec balcon. Budget flexible." },
-    { id: 2,  type: "buyer",  initials: "PD", tone: "#0EA5E9", name: "Pierre Durand",        email: "p.durand@outlook.fr",    phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "320 000 €",   zone: "Neuilly",            timeline: "3–6 mois",  projectType: "Résidence principale",     status: "contacted",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Neuilly Familles",     createdAt: "08 avr. 2026", notes: "Premier achat. Besoin d'accompagnement financement." },
-    { id: 3,  type: "buyer",  initials: "SM", tone: "#6366F1", name: "Sophie Martin",        email: "smartin@free.fr",        phone: "+33 7 12 34 56 78", phoneVerified: false, budget: "680 000 €",   zone: "Paris 7e",           timeline: "Immédiat",  projectType: "Pied-à-terre",              status: "to_process",     score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",     createdAt: "09 avr. 2026", notes: "" },
-    { id: 4,  type: "buyer",  initials: "JM", tone: "#14B8A6", name: "Jean-Baptiste Moreau", email: "jb.moreau@gmail.com",    phone: "+33 6 23 45 67 89", phoneVerified: true,  budget: "275 000 €",   zone: "Boulogne",           timeline: "6–12 mois", projectType: "Résidence principale",     status: "contacted",      score: "cold", source: "fb",     assignedAgentId: 1,    campaign: "Boulogne Actifs",      createdAt: "07 avr. 2026", notes: "Rappeler lundi matin. Intéressé par T2 avec parking." },
-    { id: 5,  type: "buyer",  initials: "CR", tone: "#F97316", name: "Camille Rousseau",     email: "camille.r@icloud.com",   phone: "+33 7 34 56 78 90", phoneVerified: true,  budget: "520 000 €",   zone: "Paris 8e",           timeline: "1–3 mois",  projectType: "Investissement patrimonial", status: "to_process",     score: "warm", source: "ig",     assignedAgentId: null, campaign: "Prestige Madeleine",   createdAt: "09 avr. 2026", notes: "Investissement locatif. Cherche rentabilité > 4%." },
-    { id: 6,  type: "buyer",  initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "895 000 €",   zone: "Paris 17e",          timeline: "1–3 mois",  projectType: "Résidence principale",     status: "visit_planned",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e",   createdAt: "05 avr. 2026", notes: "Visite prévue mercredi 14h." },
-    { id: 7,  type: "buyer",  initials: "IC", tone: "#8B5CF6", name: "Isabelle Chen",        email: "ichen@proton.me",        phone: "+33 7 56 78 90 12", phoneVerified: true,  budget: "850 000 €",   zone: "Paris 6e",           timeline: "Immédiat",  projectType: "Résidence principale",     status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",     createdAt: "06 avr. 2026", notes: "Expatriée, retour en France. Budget confortable." },
-    { id: 8,  type: "buyer",  initials: "LF", tone: "#64748B", name: "Lucas Fontaine",       email: "l.fontaine@gmail.com",   phone: "+33 6 67 89 01 23", phoneVerified: false, budget: "195 000 €",   zone: "Paris 19e",          timeline: "6–12 mois", projectType: "Phase d'exploration",      status: "lost",           score: "cold", source: "web",    assignedAgentId: 2,    campaign: "—",                    createdAt: "04 avr. 2026", notes: "Budget insuffisant pour le secteur." },
-    { id: 9,  type: "buyer",  initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "415 000 €",   zone: "Paris 11e",          timeline: "1–3 mois",  projectType: "Résidence principale",     status: "contacted",      score: "warm", source: "email",  assignedAgentId: null, campaign: "—",                    createdAt: "08 avr. 2026", notes: "Formulaire site web. Rappeler en soirée." },
-    { id: 10, type: "buyer",  initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "1 200 000 €", zone: "Paris 16e",          timeline: "Immédiat",  projectType: "Résidence principale",     status: "offer_made",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e",   createdAt: "07 avr. 2026", notes: "Recherche hôtel particulier. Offre transmise mardi." },
-    { id: 11, type: "seller", initials: "CV", tone: "#F59E0B", name: "Christine Vidal",      email: "c.vidal@orange.fr",      phone: "+33 6 90 12 34 56", phoneVerified: true,  surface: 85,  rooms: 4, expectedPrice: "1 150 000 €", condition: "Bon état",      zone: "Paris 6e",           sellingTimeline: "3–6 mois", status: "estimation_sent", score: "warm", source: "ig",     assignedAgentId: 1,    campaign: "Estimation Rive Gauche", createdAt: "06 avr. 2026", notes: "Propriétaire depuis 12 ans. Souhaite aussi acheter après vente." },
-    { id: 12, type: "seller", initials: "PA", tone: "#7C3AED", name: "Philippe Arnaud",      email: "p.arnaud@icloud.com",    phone: "+33 7 01 23 45 67", phoneVerified: true,  surface: 120, rooms: 5, expectedPrice: "2 400 000 €", condition: "Rénové",         zone: "Saint-Tropez",       sellingTimeline: "Immédiat", status: "appointment",     score: "hot",  source: "manual", assignedAgentId: 2,    campaign: "—",                      createdAt: "03 avr. 2026", notes: "Villa avec vue mer. RDV samedi 10h sur site." },
+    { id: 1,  type: "buyer",  initials: "ML", tone: "#A855F7", name: "Marie Lefèvre",       email: "marie.lefevre@gmail.com", phone: "+33 6 78 90 12 34", phoneVerified: true,  budget: "450 000 €",   zone: "Paris 16e",         timeline: "1–3 mois",  projectType: "Résidence principale",     status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e",   createdAt: "2026-04-09", notes: "Recherche 3 pièces avec balcon. Budget flexible." },
+    { id: 2,  type: "buyer",  initials: "PD", tone: "#0EA5E9", name: "Pierre Durand",        email: "p.durand@outlook.fr",    phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "320 000 €",   zone: "Neuilly",            timeline: "3–6 mois",  projectType: "Résidence principale",     status: "contacted",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Neuilly Familles",     createdAt: "2026-04-08", notes: "Premier achat. Besoin d'accompagnement financement." },
+    { id: 3,  type: "buyer",  initials: "SM", tone: "#6366F1", name: "Sophie Martin",        email: "smartin@free.fr",        phone: "+33 7 12 34 56 78", phoneVerified: false, budget: "680 000 €",   zone: "Paris 7e",           timeline: "Immédiat",  projectType: "Pied-à-terre",              status: "to_process",     score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",     createdAt: "2026-04-09", notes: "" },
+    { id: 4,  type: "buyer",  initials: "JM", tone: "#14B8A6", name: "Jean-Baptiste Moreau", email: "jb.moreau@gmail.com",    phone: "+33 6 23 45 67 89", phoneVerified: true,  budget: "275 000 €",   zone: "Boulogne",           timeline: "6–12 mois", projectType: "Résidence principale",     status: "contacted",      score: "cold", source: "fb",     assignedAgentId: 1,    campaign: "Boulogne Actifs",      createdAt: "2026-04-07", notes: "Rappeler lundi matin. Intéressé par T2 avec parking." },
+    { id: 5,  type: "buyer",  initials: "CR", tone: "#F97316", name: "Camille Rousseau",     email: "camille.r@icloud.com",   phone: "+33 7 34 56 78 90", phoneVerified: true,  budget: "520 000 €",   zone: "Paris 8e",           timeline: "1–3 mois",  projectType: "Investissement patrimonial", status: "to_process",     score: "warm", source: "ig",     assignedAgentId: null, campaign: "Prestige Madeleine",   createdAt: "2026-04-09", notes: "Investissement locatif. Cherche rentabilité > 4%." },
+    { id: 6,  type: "buyer",  initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "895 000 €",   zone: "Paris 17e",          timeline: "1–3 mois",  projectType: "Résidence principale",     status: "visit_planned",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e",   createdAt: "2026-04-05", notes: "Visite prévue mercredi 14h." },
+    { id: 7,  type: "buyer",  initials: "IC", tone: "#8B5CF6", name: "Isabelle Chen",        email: "ichen@proton.me",        phone: "+33 7 56 78 90 12", phoneVerified: true,  budget: "850 000 €",   zone: "Paris 6e",           timeline: "Immédiat",  projectType: "Résidence principale",     status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",     createdAt: "2026-04-06", notes: "Expatriée, retour en France. Budget confortable." },
+    { id: 8,  type: "buyer",  initials: "LF", tone: "#64748B", name: "Lucas Fontaine",       email: "l.fontaine@gmail.com",   phone: "+33 6 67 89 01 23", phoneVerified: false, budget: "195 000 €",   zone: "Paris 19e",          timeline: "6–12 mois", projectType: "Phase d'exploration",      status: "lost",           score: "cold", source: "web",    assignedAgentId: 2,    campaign: "—",                    createdAt: "2026-04-04", notes: "Budget insuffisant pour le secteur." },
+    { id: 9,  type: "buyer",  initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "415 000 €",   zone: "Paris 11e",          timeline: "1–3 mois",  projectType: "Résidence principale",     status: "contacted",      score: "warm", source: "email",  assignedAgentId: null, campaign: "—",                    createdAt: "2026-04-08", notes: "Formulaire site web. Rappeler en soirée." },
+    { id: 10, type: "buyer",  initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "1 200 000 €", zone: "Paris 16e",          timeline: "Immédiat",  projectType: "Résidence principale",     status: "offer_made",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e",   createdAt: "2026-04-07", notes: "Recherche hôtel particulier. Offre transmise mardi." },
+    { id: 11, type: "seller", initials: "CV", tone: "#F59E0B", name: "Christine Vidal",      email: "c.vidal@orange.fr",      phone: "+33 6 90 12 34 56", phoneVerified: true,  surface: 85,  rooms: 4, expectedPrice: "1 150 000 €", condition: "Bon état",      zone: "Paris 6e",           sellingTimeline: "3–6 mois", status: "estimation_sent", score: "warm", source: "ig",     assignedAgentId: 1,    campaign: "Estimation Rive Gauche", createdAt: "2026-04-06", notes: "Propriétaire depuis 12 ans. Souhaite aussi acheter après vente." },
+    { id: 12, type: "seller", initials: "PA", tone: "#7C3AED", name: "Philippe Arnaud",      email: "p.arnaud@icloud.com",    phone: "+33 7 01 23 45 67", phoneVerified: true,  surface: 120, rooms: 5, expectedPrice: "2 400 000 €", condition: "Rénové",         zone: "Saint-Tropez",       sellingTimeline: "Immédiat", status: "appointment",     score: "hot",  source: "manual", assignedAgentId: 2,    campaign: "—",                      createdAt: "2026-04-03", notes: "Villa avec vue mer. RDV samedi 10h sur site." },
   ],
 };
 
@@ -1826,6 +2021,56 @@ function leadTimeline(lead) {
   return lead.type === "seller" ? lead.sellingTimeline : lead.timeline;
 }
 
+/* French-short formatter for the ISO createdAt field. Stored ISO (sortable),
+   displayed French. When the backend lands and real timestamps come in,
+   this is the single function to upgrade (moment/intl). */
+const MONTHS_FR_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin",
+                         "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+function formatLeadDate(iso) {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;  // malformed — show raw so bugs are visible
+  return `${String(d).padStart(2, "0")} ${MONTHS_FR_SHORT[m - 1]} ${y}`;
+}
+
+/* Extract numeric budget for sort. budget/expectedPrice are formatted strings
+   like "1 200 000 €" — strip non-digits and parse. Missing values sort last
+   (returned Infinity in asc, -Infinity conceptually in desc via sign flip).
+   Returns 0 if nothing numeric (unset). */
+function leadPriceNumeric(lead) {
+  const raw = lead.type === "seller" ? lead.expectedPrice : lead.budget;
+  if (!raw) return 0;
+  const digits = String(raw).replace(/\D/g, "");
+  return digits ? parseInt(digits, 10) : 0;
+}
+
+/* score sort order: hot > warm > cold (decreasing urgency).
+   Unknown scores sort last. */
+const SCORE_ORDER = { hot: 3, warm: 2, cold: 1 };
+function leadScoreOrder(lead) { return SCORE_ORDER[lead.score] || 0; }
+
+/* Agent name lookup for sort. Unassigned leads sort as empty string (top in
+   asc, bottom in desc). */
+function leadAgentName(lead) {
+  if (lead.assignedAgentId == null) return "";
+  const agent = state.team.find(t => t.id === lead.assignedAgentId);
+  return agent ? agent.name : "";
+}
+
+/* Sort comparator factory. Returns a function (a, b) => number per column.
+   Direction applied by the caller (multiply result by -1 for desc). */
+function leadComparator(column) {
+  switch (column) {
+    case "name":   return (a, b) => a.name.localeCompare(b.name,   "fr");
+    case "budget": return (a, b) => leadPriceNumeric(a) - leadPriceNumeric(b);
+    case "zone":   return (a, b) => (a.zone || "").localeCompare(b.zone || "", "fr");
+    case "score":  return (a, b) => leadScoreOrder(a) - leadScoreOrder(b);
+    case "agent":  return (a, b) => leadAgentName(a).localeCompare(leadAgentName(b), "fr");
+    case "date":   return (a, b) => (a.createdAt || "").localeCompare(b.createdAt || "");  // ISO string compare = chronological
+    default:       return (a, b) => a.id - b.id;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════
    ICONS — inline SVG so we don't ship an icon lib.
    Each icon is a function returning an SVG string with current color.
@@ -1869,6 +2114,13 @@ const icon = {
   // Table-action icons
   sort:        () => svg(`<path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/>`),
   filter:      () => svg(`<line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/>`),
+
+  // Column-sort indicators + bulk action icons (v0.9.0)
+  arrowUp:     () => svg(`<path d="M5 12l7-7 7 7"/><path d="M12 19V5"/>`),
+  arrowDown:   () => svg(`<path d="M19 12l-7 7-7-7"/><path d="M12 5v14"/>`),
+  chevronsUpDown: () => svg(`<path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/>`),
+  trash:       () => svg(`<path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>`),
+  userCheck:   () => svg(`<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>`),
 };
 function svg(body, size=24) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -2210,6 +2462,14 @@ function computeLeadsView() {
     return l.status === state.filterTab;
   });
 
+  // Apply column sort. null = default order (by state.leads insertion = by id).
+  // Sort happens LAST so filter + search don't depend on sort direction.
+  if (state.leadsSort) {
+    const cmp = leadComparator(state.leadsSort.column);
+    const factor = state.leadsSort.direction === "asc" ? 1 : -1;
+    visible.sort((a, b) => cmp(a, b) * factor);
+  }
+
   return {
     visible,
     pipeline,
@@ -2370,22 +2630,56 @@ function renderLeadsEmptyState(kind) {
    lead — uses the existing open-drawer action. Selected row carries
    data-selected for a subtle highlight. Agent column falls back to an
    em-dash when unassigned; same convention as the Layer 1 card. */
+/* Sortable column header. `key` matches the leadComparator switch keys +
+   the column width modifier class. Clickable. Displays a tri-state
+   indicator: unsorted → muted double-chevron; active asc → arrow up;
+   active desc → arrow down. Click cycles desc → asc → unsorted. */
+function renderColumnHeader(key, label, colClass) {
+  const sort = state.leadsSort;
+  const isActive = sort && sort.column === key;
+  let indicator;
+  if (!isActive) {
+    indicator = `<span class="leads-col-sort leads-col-sort--idle">${icon.chevronsUpDown()}</span>`;
+  } else if (sort.direction === "desc") {
+    indicator = `<span class="leads-col-sort leads-col-sort--active">${icon.arrowDown()}</span>`;
+  } else {
+    indicator = `<span class="leads-col-sort leads-col-sort--active">${icon.arrowUp()}</span>`;
+  }
+  return `
+    <button class="leads-col ${colClass} leads-col-header"
+            data-action="sort-column"
+            data-column="${key}"
+            aria-sort="${isActive ? sort.direction + "ending" : "none"}">
+      <span>${label}</span>${indicator}
+    </button>
+  `;
+}
+
+/* Single table row. In default mode, click = open drawer. In select mode,
+   click = toggle selection for that lead (drawer NOT opened). The mode
+   branch happens in the click handler, not here — the row always carries
+   data-lead-id + a dual-purpose data-action. */
 function renderLeadRow(lead) {
-  const selected  = state.drawer?.leadId === lead.id;
-  const agent     = lead.assignedAgentId != null
+  const selected     = state.drawer?.leadId === lead.id;
+  const picked       = state.selectedLeadIds.includes(lead.id);
+  const agent        = lead.assignedAgentId != null
     ? state.team.find(t => t.id === lead.assignedAgentId)
     : null;
-  const agentCell = agent
+  const agentCell    = agent
     ? `<span class="leads-row-agent" title="${agent.name}">${renderAvatar(agent.initials, agent.tone, 26)}</span>`
     : `<span class="leads-row-agent leads-row-agent--none" aria-label="Non assigné">—</span>`;
-  const zone      = lead.zone || "—";
-  const timeline  = leadTimeline(lead);
+  const zone         = lead.zone || "—";
+  const timeline     = leadTimeline(lead);
+  const checkboxCell = state.selectionMode
+    ? `<div class="leads-col leads-col--check"><span class="leads-checkbox ${picked ? "leads-checkbox--on" : ""}" aria-hidden="true">${picked ? icon.check() : ""}</span></div>`
+    : "";
   return `
-    <div class="leads-row"
-         data-action="open-drawer"
+    <div class="leads-row${picked ? " leads-row--picked" : ""}"
+         data-action="row-click"
          data-lead-id="${lead.id}"
          data-selected="${selected}"
          role="button" tabindex="0">
+      ${checkboxCell}
       <div class="leads-col leads-col--nom">
         ${renderAvatar(lead.initials, lead.tone, 34)}
         <div class="leads-col-nom-text">
@@ -2397,30 +2691,63 @@ function renderLeadRow(lead) {
       <div class="leads-col leads-col--zone">${zone}${timeline ? ` · ${timeline}` : ""}</div>
       <div class="leads-col leads-col--score">${renderScoreChip(lead.score)}</div>
       <div class="leads-col leads-col--agent">${agentCell}</div>
-      <div class="leads-col leads-col--date">${lead.createdAt}</div>
+      <div class="leads-col leads-col--date">${formatLeadDate(lead.createdAt)}</div>
     </div>
   `;
 }
 
-/* Leads table card: contained Prodex-style card with a header row
-   (identity + search + Sort + Filter), column headers, and the row body.
-   The search input is the same renderLeadsSearch primitive, just placed
-   inside this card's header instead of a naked controls row. Sort and
-   Filter buttons are stubs for now (their popovers ship after Layer 2);
-   the Filter button carries a count badge when filters are active. */
+/* Bulk action bar: pinned to the bottom of the table card when at least
+   one lead is selected. Slides in from below. Actions are stubs for now
+   (popovers ship as a follow-up), but the selection semantics are live. */
+function renderBulkActionBar() {
+  const n = state.selectedLeadIds.length;
+  if (n === 0) return "";
+  const countText = `${n} sélectionné${n === 1 ? "" : "s"}`;
+  return `
+    <div class="leads-bulk-bar" role="region" aria-label="Actions groupées">
+      <div class="leads-bulk-bar-count">
+        <span class="leads-bulk-bar-dot" aria-hidden="true"></span>
+        ${countText}
+      </div>
+      <div class="leads-bulk-bar-actions">
+        <button class="leads-bulk-btn" data-action="bulk-assign">${icon.userCheck()}<span>Assigner</span></button>
+        <button class="leads-bulk-btn" data-action="bulk-change-status">${icon.target()}<span>Changer le statut</span></button>
+        <button class="leads-bulk-btn" data-action="bulk-archive">${icon.archive()}<span>Archiver</span></button>
+        <button class="leads-bulk-btn leads-bulk-btn--danger" data-action="bulk-delete">${icon.trash()}<span>Supprimer</span></button>
+      </div>
+      <button class="leads-bulk-bar-clear" data-action="clear-selection" aria-label="Effacer la sélection">${icon.close()}</button>
+    </div>
+  `;
+}
+
+/* Leads table card: contained Prodex-style card. Header is now minimal —
+   just the title "Liste des leads" (no icon, no meta line), search, and
+   the two action buttons (Sélectionner / Annuler, then Filtrer). When in
+   select mode, the leftmost column becomes a checkbox column — header
+   gets a "select all visible" checkbox, rows get per-row checkboxes.
+   When selection > 0, a bulk action bar renders at the bottom of the card. */
 function renderLeadsTable(view) {
-  const totalVisible = view.visible.length;
-  const filterActive = state.filterTab !== "all" && state.filterTab !== "lost";
-  const filterBadge  = filterActive
+  const totalVisible     = view.visible.length;
+  const visibleIds       = view.visible.map(l => l.id);
+  const filterActive     = state.filterTab !== "all" && state.filterTab !== "lost";
+  const filterBadge      = filterActive
     ? `<span class="leads-table-btn-badge">1</span>`
     : "";
-  const activeStageLabel = filterActive
-    ? stageLabel(state.leadType, state.filterTab)
-    : null;
-  const meta = activeStageLabel
-    ? `${totalVisible} lead${totalVisible === 1 ? "" : "s"} filtré${totalVisible === 1 ? "" : "s"} par « ${activeStageLabel} »`
-    : `${totalVisible} lead${totalVisible === 1 ? "" : "s"} au total · mis à jour il y a 2 min`;
-  const titleIcon = state.leadType === "buyer" ? "home" : "key";
+  // "Select all visible" is on when every visible id is already picked.
+  const allVisiblePicked = totalVisible > 0 && visibleIds.every(id => state.selectedLeadIds.includes(id));
+  const selectBtnLabel   = state.selectionMode ? "Annuler" : "Sélectionner";
+  const selectBtnClass   = state.selectionMode
+    ? "leads-table-btn leads-table-btn--active"
+    : "leads-table-btn";
+
+  const checkHead = state.selectionMode
+    ? `<div class="leads-col leads-col--check leads-col-header leads-col-header--check"
+            data-action="toggle-select-all"
+            role="columnheader"
+            aria-label="Tout sélectionner">
+        <span class="leads-checkbox ${allVisiblePicked ? "leads-checkbox--on" : ""}">${allVisiblePicked ? icon.check() : ""}</span>
+      </div>`
+    : "";
 
   const noSellers = view.type === "seller" && view.counts.typeCounts.seller === 0;
   const body = noSellers
@@ -2428,15 +2755,16 @@ function renderLeadsTable(view) {
     : totalVisible === 0
       ? renderLeadsEmptyState("no-match")
       : `
-        <div class="leads-table-head" role="row">
-          <div class="leads-col leads-col--nom" role="columnheader">Nom</div>
-          <div class="leads-col leads-col--budget" role="columnheader">Budget</div>
-          <div class="leads-col leads-col--zone" role="columnheader">Zone</div>
-          <div class="leads-col leads-col--score" role="columnheader">Score</div>
-          <div class="leads-col leads-col--agent" role="columnheader">Agent</div>
-          <div class="leads-col leads-col--date" role="columnheader">Date</div>
+        <div class="leads-table-head${state.selectionMode ? " leads-table-head--selectable" : ""}" role="row">
+          ${checkHead}
+          ${renderColumnHeader("name",   "Nom",    "leads-col--nom")}
+          ${renderColumnHeader("budget", "Budget", "leads-col--budget")}
+          ${renderColumnHeader("zone",   "Zone",   "leads-col--zone")}
+          ${renderColumnHeader("score",  "Score",  "leads-col--score")}
+          ${renderColumnHeader("agent",  "Agent",  "leads-col--agent")}
+          ${renderColumnHeader("date",   "Date",   "leads-col--date")}
         </div>
-        <div class="leads-table-body" role="rowgroup">
+        <div class="leads-table-body${state.selectionMode ? " leads-table-body--selectable" : ""}" role="rowgroup">
           ${view.visible.map(renderLeadRow).join("")}
         </div>
       `;
@@ -2445,16 +2773,12 @@ function renderLeadsTable(view) {
     <div class="leads-table-card">
       <div class="leads-table-header">
         <div class="leads-table-header-title">
-          <span class="leads-table-header-icon">${icon[titleIcon]()}</span>
-          <span class="leads-table-header-text">
-            <span class="leads-table-title">Liste des leads</span>
-            <span class="leads-table-meta">${meta}</span>
-          </span>
+          <span class="leads-table-title">Liste des leads</span>
         </div>
         <div class="leads-table-header-actions">
           ${renderLeadsSearch()}
-          <button class="leads-table-btn" data-action="open-sort-panel" aria-label="Trier">
-            ${icon.sort()}<span>Trier</span>
+          <button class="${selectBtnClass}" data-action="toggle-select-mode">
+            ${icon.check()}<span>${selectBtnLabel}</span>
           </button>
           <button class="leads-table-btn" data-action="open-filter-panel" aria-label="Filtrer">
             ${icon.filter()}<span>Filtrer</span>${filterBadge}
@@ -2462,6 +2786,7 @@ function renderLeadsTable(view) {
         </div>
       </div>
       ${body}
+      ${renderBulkActionBar()}
     </div>
   `;
 }
@@ -2517,7 +2842,7 @@ function renderRouteComingSoon() {
         <div class="empty-state-title">${title}</div>
         <div class="empty-state-body">Page à construire. Cette section sera implémentée après l'étape 2 (Leads) et l'étape 3 (tiroir).</div>
       </div>
-      <div class="empty-state-chip">v0.8.0</div>
+      <div class="empty-state-chip">v0.9.0</div>
     </div>
   `;
 }
@@ -2676,14 +3001,30 @@ document.addEventListener("click", (e) => {
       // Stub — opens the "Ajouter un prospect" modal. Form built after Step 2.
       alert("Ajouter un prospect — à venir. Construit après l'étape 2.");
       break;
-    case "open-drawer": {
+    case "row-click": {
       const leadId = Number(target.getAttribute("data-lead-id"));
-      // If clicking the same lead that's open, close. If clicking a different one, swap.
-      if (state.drawer?.leadId === leadId) {
-        setState({ drawer: null });
+      // In select mode, row click toggles lead selection. Out of select mode,
+      // row click opens (or toggles) the drawer. One click target, two modes.
+      if (state.selectionMode) {
+        const picked = state.selectedLeadIds.includes(leadId);
+        const nextIds = picked
+          ? state.selectedLeadIds.filter(id => id !== leadId)
+          : [...state.selectedLeadIds, leadId];
+        setState({ selectedLeadIds: nextIds });
       } else {
-        setState({ drawer: { leadId, tab: "infos" } });
+        // Same-lead click closes; different-lead click swaps.
+        if (state.drawer?.leadId === leadId) setState({ drawer: null });
+        else                                 setState({ drawer: { leadId, tab: "infos" } });
       }
+      break;
+    }
+    case "open-drawer": {
+      // Legacy alias — kept so any older `data-action="open-drawer"` still works
+      // (e.g. future drawer-sourced deep links). Identical to row-click out of
+      // select mode. In select mode, never routes here (rows emit row-click).
+      const leadId = Number(target.getAttribute("data-lead-id"));
+      if (state.drawer?.leadId === leadId) setState({ drawer: null });
+      else                                 setState({ drawer: { leadId, tab: "infos" } });
       break;
     }
     case "close-drawer":
@@ -2713,17 +3054,68 @@ document.addEventListener("click", (e) => {
       else                           setState({ filterTab: tabId });
       break;
     }
-    case "open-sort-panel": {
-      // Stub: the Sort popover ships as a follow-up to Layer 2. For now it
-      // acknowledges the click so users know the button is live (not dead).
-      alert("Tri par colonne — panneau à construire.");
+    case "sort-column": {
+      // Click cycle on a column header: desc → asc → no sort (back to default id order).
+      // First click on any column is always desc because real-estate data is
+      // "newest/biggest/hottest first" most of the time.
+      const col = target.getAttribute("data-column");
+      const curr = state.leadsSort;
+      let next;
+      if (!curr || curr.column !== col)           next = { column: col, direction: "desc" };
+      else if (curr.direction === "desc")         next = { column: col, direction: "asc" };
+      else                                         next = null;
+      setState({ leadsSort: next });
+      break;
+    }
+    case "toggle-select-mode": {
+      // Entering: turn the checkbox column on. Leaving: also clear selection —
+      // matches the mental model that "Annuler" means "cancel this operation".
+      if (state.selectionMode) {
+        setState({ selectionMode: false, selectedLeadIds: [] });
+      } else {
+        setState({ selectionMode: true });
+      }
+      break;
+    }
+    case "toggle-select-all": {
+      // Acts on the CURRENTLY VISIBLE rows (the view returned by computeLeadsView).
+      // If every visible lead is already picked, deselect them. Otherwise, add
+      // any missing ones to the selection. Leads picked-but-hidden stay picked.
+      const view = computeLeadsView();
+      const visibleIds = view.visible.map(l => l.id);
+      const allVisiblePicked = visibleIds.length > 0 && visibleIds.every(id => state.selectedLeadIds.includes(id));
+      const nextIds = allVisiblePicked
+        ? state.selectedLeadIds.filter(id => !visibleIds.includes(id))
+        : [...new Set([...state.selectedLeadIds, ...visibleIds])];
+      setState({ selectedLeadIds: nextIds });
+      break;
+    }
+    case "clear-selection":
+      // X on the bulk bar. Clears selection but stays in select mode —
+      // user can continue picking. Full exit is via the Annuler button / ESC.
+      setState({ selectedLeadIds: [] });
+      break;
+    case "bulk-assign":
+    case "bulk-change-status":
+    case "bulk-archive":
+    case "bulk-delete": {
+      // Stubs: popovers + confirms ship as a follow-up. Keep the selection
+      // intact so the user can see what would have been acted on.
+      const n = state.selectedLeadIds.length;
+      const verb = {
+        "bulk-assign":        "Assigner un agent à",
+        "bulk-change-status": "Changer le statut de",
+        "bulk-archive":       "Archiver",
+        "bulk-delete":        "Supprimer",
+      }[action];
+      alert(`${verb} ${n} lead${n === 1 ? "" : "s"} — action à construire.`);
       break;
     }
     case "open-filter-panel": {
       // Stub: the Filter popover (multi-dimensional refinement — score,
       // source, agent, verified, date range, show-lost) ships as a
-      // follow-up to Layer 2. The "1" badge on the button reflects the
-      // current active stage filter from the KPI cards.
+      // follow-up. The "1" badge on the button reflects the current active
+      // stage filter from the KPI cards.
       alert("Filtres avancés — panneau à construire.");
       break;
     }
@@ -2758,10 +3150,14 @@ document.addEventListener("input", (e) => {
   }
 });
 
-/* ESC key closes open drawers and dropdowns */
+/* ESC key closes open drawers and dropdowns.
+   Priority: drawer > select mode > user menu > agency switcher > sidebar.
+   Drawer wins first because it's the most "modal" surface visually. Select
+   mode is second because it's a global state the user has actively entered. */
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (state.drawer)              { setState({ drawer: null });             return; }
+  if (state.selectionMode)       { setState({ selectionMode: false, selectedLeadIds: [] }); return; }
   if (state.userMenuOpen)        { setState({ userMenuOpen: false });      return; }
   if (state.agencySwitcherOpen)  { setState({ agencySwitcherOpen: false });return; }
   if (state.sidebarOpen)         { setState({ sidebarOpen: false });       return; }
