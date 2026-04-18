@@ -1954,7 +1954,12 @@
   @media (max-width: 1024px) { .stage-card--prio-4 { display: none; } }
   @media (max-width: 860px)  { .stage-card--prio-3 { display: none; } }
   @media (max-width: 720px)  { .stage-card--prio-2 { display: none; } }
-  @media (max-width: 560px)  { .stage-card--prio-1 { display: none; } }
+  /* v0.10.0 — 560px rule removed. Previously hid prio-1 at phone
+     width, collapsing the KPI row to 1 card. The two cross-cutting
+     cards (Leads aujourd'hui, Non assignés at prio 0-1) are the most
+     valuable glance data on mobile, so both stay visible at all
+     widths. Pipeline cards (prio 2+) still hide progressively — stage
+     filtering at phone width belongs in the Filter popover. */
   /* The active filter card is preserved regardless of priority — ensures
      a user filtering by "Converti" at narrow width still sees that card
      so they can deselect it. Highest specificity wins over hide rules. */
