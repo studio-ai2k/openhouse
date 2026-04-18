@@ -51,183 +51,12 @@
   Not in v0.10.0 (still coming):
   - Step 3 drawer tab bodies (Infos / Qualification / Activité / Notes)
   - Filter popover + bulk action popovers
-  - CSS extraction into app/index.css (file now 3830 lines — past the
+  - CSS extraction into app/index.css (file now 3700+ lines — past the
     3500 soft limit; flagged as next structural cycle in HANDOFF §10a)
--->
-<!--
-  === v0.9.2 original header (preserved for reference) ===
 
-  Open House Prospects — v0.9.2
-  Polish tick on top of v0.9.1 · KPI row refocused on live, actionable data
-
-  v0.9.2 makes three small but semantically important changes to the
-  Leads KPI row, driven by a Greg-originated observation that the
-  end-of-pipeline stages (Offre faite, Converti, Vendu) have such low
-  volume that their cards are nearly always 0/1 — the KPI row real
-  estate was wasted on near-flat numbers.
-
-    1. Drop late-pipeline stages from the KPI row:
-         - Buyer:  offer_made, converted  (drop)
-         - Seller: sold                   (drop)
-       These stages remain fully alive in state.agency.pipeline, in the
-       drawer's Qualification dropdown, in the Database page, and in
-       the Meta CAPI feedback flow (Converti → Purchase event). The drop
-       is PURELY VISUAL — this is a glance-bar design change, not a
-       data-model change.
-
-    2. Prepend two cross-cutting KPI cards:
-         - "Leads aujourd'hui"  — filters to createdAt = today (any stage)
-         - "Non assignés"       — filters to assignedAgentId = null (any stage)
-       Both cards use neutral (off-palette) colors so they read as a
-       different category from pipeline-stage cards. Both clickable,
-       same filter interaction model — tap to filter, tap active card
-       to deselect.
-
-    3. New state.filterTab values: "today" and "unassigned". Both
-       handled in computeLeadsView alongside the existing stage-id
-       values and the legacy "all" / "lost".
-
-  New icons: clock (Leads aujourd'hui), userX (Non assignés).
-
-  CSS additions: .stage-card--neutral rules providing neutral icon badge,
-  active state, and label/count colors. Uses existing --surface-tint /
-  --active-warm tokens, no new palette entries.
-
-  Progressive-hide breakpoints unchanged from v0.9.1 — the buyer row now
-  has 6 visible slots by default (2 cross-cutting + 4 pipeline), down
-  from the conceptual 6 pipeline cards before. The existing
-  .stage-card--prio-{0..5} hide rules work unchanged — cross-cutting
-  cards take slots 0-1, pipeline cards take slots 2-5 in buyer view.
-
-  Not in v0.9.2 (still coming in v0.10.0):
-  - Mobile lead card layout (below 600px breakpoint)
-  - lead.activity[] data model field
-  - Left accent bar on untouched leads
-  - Step 3 drawer tab bodies
--->
-<!--
-  === v0.9.1 original header (preserved for reference) ===
-
-  Open House Prospects — v0.9.1
-  Polish batch on top of v0.9.0 · mini-cycle before mobile card rebuild (v0.10.0)
-
-  v0.9.1 lands three small improvements and two drawer changes that were
-  ready before the mobile card work:
-
-    1. Drawer header breathing room — bottom padding raised 16→40px, so
-       the separator sits lower and the header has room for future chips
-       (phone-verified, score, etc. — parked).
-    2. Source icon in drawer header — renderSourceIcon upgraded from
-       text-char ("IG", "f") to Lucide-style SVG chip (new instagram,
-       facebook, globe, mail, userPlus icons). Renders below the meta
-       line via .drawer-header-extras.
-    3. iOS safe-area insets — mobile sidebar padding uses
-       env(safe-area-inset-top/bottom), mobile topbar extends height by
-       inset-top. Fixes standalone PWA mode: sidebar reaches edges, topbar
-       no longer jumps under the notch on scroll.
-    4. Budget/Zone header font leak — .leads-col--budget / --zone / --date
-       body-cell styles were leaking onto the column header buttons
-       (shared class name). Scoped under .leads-table-body so header
-       labels use their intended header typography.
-    5. KPI stage cards progressive hide — instead of wrapping to 3/2 rows
-       at narrow viewports, cards now live in a single flex row and
-       progressively hide by priority (not pipeline flow). Priority
-       order for buyer: À traiter, Qualifié, Visite programmée, Offre
-       faite, Contacté, Converti (manager's glance-priority). The active
-       filter card never hides even at the narrowest width.
-    6. Bulk bar "masked by filter" hint — when selection includes leads
-       outside the current filter/search view, the bulk bar shows
-       "N sélectionnés · M masqués" so the count never looks broken.
-
-  Also in DATA_MODEL.md: Meta form labels (buyer) section added with
-  verbatim French question wording for the Paris Luxury Homes form.
-  Two strings flagged with <!-- TODO --> for screenshot verification.
-
-  Not in v0.9.1 (coming in v0.10.0):
-  - Mobile lead card layout (below 600px breakpoint)
-  - lead.activity[] data model field + dummy activity entries
-  - Left accent bar on untouched leads
-  - Step 3 drawer tab bodies (Infos / Qualification / Activité / Notes)
-
-  All v0.9.0 semantics preserved unchanged — see earlier history below.
--->
-<!--
-  === v0.9.0 original header (preserved for reference) ===
-
-  Open House Prospects — v0.9.0
-  Step 2 Layer 2+ — Select mode + column sort shipped; table header stripped
-  Reference: docs/DESIGN_SPEC.md + Prodex Top Products card
-  Workflow: docs/DESIGN_PROTOCOL.md
-
-  v0.9.0 is a polish + capability push on the Layer 2 table. Four user
-  calls drove the changes:
-
-    1. Drop the icon beside "Liste des leads" — the title is unambiguous,
-       the icon was visual noise. Removed from renderLeadsTable + CSS.
-    2. Drop the "Mis à jour il y a 2 min / N leads filtrés par…" sub-meta
-       line. The stage card row up top already carries both signals
-       (active-card highlight = what's filtered, updated-time = toggle row).
-    3. Drop the Trier button. Column headers are now clickable and cycle
-       desc → asc → no-sort. Double-chevron indicator when idle, single
-       arrow when active. One column sortable at a time.
-    4. Add a Sélectionner button for bulk actions. Click → enter select
-       mode: leftmost checkbox column appears, header gets a "select all
-       visible" checkbox, rows get per-row checkboxes. Row click toggles
-       selection instead of opening drawer. When selectedLeadIds > 0, a
-       bulk action bar pins to the bottom of the card with Assigner /
-       Changer statut / Archiver / Supprimer buttons.
-
-  Select mode semantics:
-  - Selection PERSISTS across filter changes and type flip. "I picked
-    these to act on" beats "these happen to be visible right now". The
-    count on the bulk bar may exceed visible-row count — that's fine.
-  - "Select all visible" only adds currently-visible rows to the pick
-    set; existing off-screen picks stay picked.
-  - Clicking the active Sélectionner button (now labelled Annuler) exits
-    select mode AND clears the pick set.
-  - The X on the bulk bar clears the pick set but STAYS in select mode.
-  - ESC priority: drawer → select mode → user menu → agency switcher →
-    sidebar.
-
-  Bulk actions (Assigner, Changer statut, Archiver, Supprimer) are all
-  stubbed with alerts. Popovers and confirms ship as a follow-up, but the
-  mode + selection UX is live and real.
-
-  Sort implementation:
-  - state.leadsSort = null | { column, direction }.
-  - leadComparator(column) returns a (a, b) => number comparator per column.
-  - computeLeadsView applies sort LAST, after filter + search.
-  - Numeric fields parse digits out of formatted strings (leadPriceNumeric).
-  - Date is stored as ISO "2026-04-09" now (was "09 avr. 2026" in v0.8.0);
-    formatLeadDate(iso) renders the French short form for display.
-  - Score orders hot(3) > warm(2) > cold(1). Agent sorts by name with
-    empty string for unassigned.
-
-  State adds (v0.9.0):
-  - leadsSort:       null | { column, direction }
-  - selectionMode:   boolean
-  - selectedLeadIds: number[]
-
-  New click handlers: sort-column, toggle-select-mode, toggle-select-all,
-  clear-selection, bulk-assign, bulk-change-status, bulk-archive, bulk-delete.
-  The old open-drawer action is kept as a legacy alias; new rows emit
-  row-click which checks selectionMode and dispatches accordingly.
-
-  New icons: arrowUp, arrowDown, chevronsUpDown, trash, userCheck.
-
-  Deleted from v0.8.0:
-  - .leads-table-header-icon + .leads-table-meta CSS
-  - renderLeadsTable's icon + meta-line JSX
-  - The Trier button (data-action open-sort-panel deleted along with the
-    stub handler — it was only wired to an alert).
-  - Static column header labels (now rendered through renderColumnHeader).
-
-  What v0.9.0 does NOT include (deferred):
-  - Real popovers for Assigner / Changer statut / Filtrer (all stubs)
-  - A confirmation modal for Supprimer
-  - Indeterminate visual on the "select all" header checkbox when only
-    some visible rows are picked (skipped for MVP — checked or unchecked)
-  - Step 3 drawer bodies (Infos / Qualification / Activité / Notes)
+  For prior version history, see HANDOFF.md §13 (audit notes) — the
+  previous preserved-headers-in-HTML pattern was removed at v0.10.0
+  to avoid duplication and comment rot.
 -->
 <html lang="fr">
 <head>
@@ -1950,9 +1779,10 @@
 
   /* Activity badge stack — right column, top-aligned, vertical. Shows
      one badge per distinct activity type present on the lead (call,
-     email, whatsapp, note). Outline-only done style: solid black border,
-     transparent fill, black icon. Not clickable — card-level tap handles
-     everything. */
+     email, whatsapp, note). Outline-only done style: muted grey border,
+     muted icon, transparent fill. Sits quietly alongside the name /
+     score chip without competing. Not clickable — card-level tap
+     handles everything. */
   .leads-card-activity {
     display: flex;
     flex-direction: column;
@@ -1970,8 +1800,8 @@
     align-items: center;
     justify-content: center;
     background: transparent;
-    border: 1px solid var(--text-primary);
-    color: var(--text-primary);
+    border: 1px solid var(--text-secondary);
+    color: var(--text-secondary);
     flex-shrink: 0;
   }
   .activity-badge svg {
