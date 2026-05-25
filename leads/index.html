@@ -1,10 +1,77 @@
 <!doctype html>
 <!--
-  Open House Leads — v0.10.5
-  Docs cycle + playbook restructure
+  Open House Leads — v0.11.1
+  V1 table surgery (Greg lean direction). Build contract: V1_SCOPE.md.
 
-  v0.10.5 is a docs-only cycle — no app functionality changed.
-  Two groups of changes landed together:
+  v0.11.0 was the docs-only pivot cycle (scope change recorded; app untouched).
+  v0.11.1 is the first V1 APP change — the table surgery:
+    - Columns: Nom · Budget · Secteur · Timing · Score · Date.
+      Agent column removed (assignedAgentId kept in data for V2).
+      Secteur and Timing are separate columns (never merged).
+    - Budget renders as a tag; tiers re-bracketed to luxury
+      (Moins de 1M / 1M-2M / 2M-4M / 4M+).
+    - Date renders human (Aujourd'hui / Hier / Il y a N jours / terse beyond).
+      Dummy createdAt anchored to runtime via daysAgoISO so it always demos.
+    - Score is a click-to-cycle badge (Chaud→Tiède→Froid), auto-save, no modal.
+      Editable from the table row AND the mobile card. Score IS the V1 qual.
+    - Stage-KPI filter row dropped (no pipeline stages in V1). renderStageCards
+      kept in file, just not called — V2 re-enables.
+    - Vendeurs toggle greyed/inert with a "Bientôt" tag (leadType stays buyer).
+    - Buyer dummy data re-shaped to Greg's Magrey form (secteur groupings,
+      Greg's timing/projet options, features[]). Sellers left dormant/unchanged.
+
+  Still V2 (preserved, not deleted): pipeline, agents, other pages, CAPI,
+  drawer Activité/timeline, multi-tenancy UI. See PROJECT_SUMMARY.md, HANDOFF
+  §11, PARKED.md. Source brief: openhouse_V1_brief.pdf (zip root).
+
+  --- still to come in the V1 line ---
+    drawer : collapse 4 tabs -> single "Centre d'action" (Infos / Messages
+             rapides / Qualification rapide / Notes).   [next cycle]
+    polish : H1 prefix still reads "Prospects ·" (line ~3210) — French wording
+             decision (Prospects vs Leads) left for Leo; nav already says "Leads".
+
+  === prior cycle: v0.10.6 — Report content refresh (master-zip lockstep) ===
+
+  v0.10.6 is a report-only cycle — no app functionality changed.
+  The app (leads/index.html) is untouched. This version bump exists
+  to restore lockstep between the master zip and its contents after
+  the v0.10.5 tracked debt (see HANDOFF §4 decision 24).
+
+  === Report content refresh (report/index.html) ===
+    1. "Open House Prospects" → "Open House Leads" throughout the
+       report (5 hits: <title>, hero headline, Origines prose,
+       Phase actuelle prose, SVG architecture diagram, legacy
+       changelog entry at line 614).
+    2. Hero prose now reflects v0.10.5 line count (~4 069 lignes,
+       was ~3 900).
+    3. "Phase actuelle" card rewritten: adds v0.10.3 (split-card
+       toggle), v0.10.4 (mobile creation time), v0.10.5
+       (restructure) progress. "Prochaine étape immédiate" now
+       references the two HANDOFF §7 blockers (Agent-vs-Manager,
+       desktop table redesign) before the drawer tabs.
+    4. Phase 2 roadmap description lightly tweaked for accuracy
+       (shell vs drawer-bodies distinction).
+    5. Toggle Acquéreurs/Vendeurs module description updated to
+       V11 split-card wording (was pre-v0.10.3 pill description).
+    6. 4 new changelog entries prepended: v0.10.5, v0.10.4,
+       v0.10.3, v0.10.2. Pre-existing v0.10.0–0.10.1 entry kept
+       as a merged entry (Leo's locked decision Q3).
+    7. Roadmap percentages unchanged — 30% Phase 2 floor held
+       per briefing §6b (drawer bodies + 5 other pages still
+       blocked on Open House workflow info, HANDOFF §10).
+    8. Pipeline-fill unchanged at 0.16.
+
+  === NOT in v0.10.6 (deliberate) ===
+  - ROADMAP_EVAL.md methodology drift (rendered 8 phases vs EVAL
+    doc 8 phases) flagged for its own dedicated cycle. See
+    REFRESH_BRIEFING.md §3.
+  - App page H1 still reads "Prospects · [mode]" in
+    leads/index.html:3106. Flagged as drift between product name
+    and UI copy — queued for a future polish cycle alongside
+    HANDOFF §7 queued items.
+
+  === v0.10.5 (previous) ===
+  Docs cycle + playbook restructure. Two groups of changes:
 
   === Content (original v0.10.5) ===
     1. HANDOFF §7 "Next step" rewritten. Step 3 (drawer tab bodies)
@@ -1506,12 +1573,12 @@
   .leads-row {
     display: grid;
     grid-template-columns:
-      minmax(180px, 2.2fr)  /* Nom (avatar + name + email)   */
-      minmax(100px, 1fr)    /* Budget                         */
-      minmax(140px, 1.4fr)  /* Zone · timeline                */
-      minmax(90px,  0.9fr)  /* Score chip                     */
-      minmax(70px,  0.8fr)  /* Agent avatar                   */
-      minmax(72px,  0.9fr); /* Date                           */
+      minmax(170px, 2.1fr)  /* Nom (avatar + name + email)   */
+      minmax(92px,  0.9fr)  /* Budget (tag)                   */
+      minmax(130px, 1.2fr)  /* Secteur                        */
+      minmax(150px, 1.3fr)  /* Timing                         */
+      minmax(86px,  0.85fr) /* Score chip                     */
+      minmax(86px,  0.9fr); /* Date                           */
     gap: 14px;
     align-items: center;
   }
@@ -1521,12 +1588,12 @@
   .leads-table-body--selectable .leads-row {
     grid-template-columns:
       44px                  /* Checkbox (fixed width)        */
-      minmax(180px, 2.2fr)
-      minmax(100px, 1fr)
-      minmax(140px, 1.4fr)
-      minmax(90px,  0.9fr)
-      minmax(70px,  0.8fr)
-      minmax(72px,  0.9fr);
+      minmax(170px, 2.1fr)
+      minmax(92px,  0.9fr)
+      minmax(130px, 1.2fr)
+      minmax(150px, 1.3fr)
+      minmax(86px,  0.85fr)
+      minmax(86px,  0.9fr);
   }
   .leads-table-head {
     padding: 12px 22px 10px;
@@ -1750,12 +1817,29 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.2px;
   }
-  .leads-table-body .leads-col--zone {
+  .leads-table-body .leads-col--zone,
+  .leads-table-body .leads-col--secteur,
+  .leads-table-body .leads-col--timing {
     font-size: 13px;
     color: var(--text-body);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .leads-table-body .leads-col--timing { color: var(--text-secondary); }
+  /* V1 budget tag — small neutral pill in the Budget column. */
+  .budget-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 7px;
+    background: var(--surface-tint, #F1F1F4);
+    border: 1px solid var(--border-subtle);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.1px;
+    white-space: nowrap;
   }
   .leads-table-body .leads-col--date {
     font-size: 12px;
@@ -1775,6 +1859,16 @@
     font-size: 11px;
     padding: 3px 9px;
   }
+  /* V1 click-to-cycle score badge: looks like the chip but signals it's
+     interactive (pointer + faint hover lift). Resets default button chrome. */
+  .score-chip--editable {
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    transition: filter .12s ease, transform .06s ease;
+  }
+  .score-chip--editable:hover  { filter: brightness(0.96); }
+  .score-chip--editable:active { transform: scale(0.96); }
 
   /* Empty-state inside the leads table card. Softer than the main app
      empty-state — visually a panel at the spot where rows would have been. */
@@ -2087,6 +2181,24 @@
     background: var(--type-accent-strong);
     color: var(--panel);
   }
+  /* V1 disabled Vendeurs half — visible but inert, with a "Bientôt" tag. */
+  .leads-mode-half--disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    position: relative;
+  }
+  .leads-mode-half--disabled:hover { background: transparent; }
+  .leads-mode-half-soon {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: 5px;
+    padding: 1px 5px;
+    margin-left: 4px;
+  }
   .leads-mode-divider {
     width: 1px;
     background: var(--border-subtle);
@@ -2305,6 +2417,24 @@
    STATE — single source of truth. Every render reads from here.
    Every mutation goes through setState().
    ═══════════════════════════════════════════════════════════════ */
+/* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
+   daysAgoISO anchors dummy lead dates to runtime so the human date column
+   (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
+   drives the click-to-change score badge. TIMING_ORDER ranks the Timing
+   column for sort (sooner = higher). */
+function daysAgoISO(days, hh = 10, mm = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  d.setHours(hh, mm, 0, 0);
+  return d.toISOString();
+}
+const SCORE_CYCLE  = ["hot", "warm", "cold"];
+const TIMING_ORDER = { "Immédiatement": 3, "Dans les 6 prochains mois": 2, "Plus de 6 mois": 1 };
+/* Terse Timing labels for the dense desktop scan column (data value is kept
+   full per Greg's form wording; only the display is shortened). */
+const TIMING_SHORT = { "Immédiatement": "Immédiat", "Dans les 6 prochains mois": "Sous 6 mois", "Plus de 6 mois": "6 mois +" };
+function timingShort(v) { return TIMING_SHORT[v] || v || "—"; }
+
 const state = {
   // user + agency context
   agency: {
@@ -2424,45 +2554,45 @@ const state = {
   // both compare against iso.slice(0, 10), so the date-portion logic
   // is unchanged — only the display layer gained time.
   leads: [
-    { id: 1,  type: "buyer",  initials: "ML", tone: "#A855F7", name: "Marie Lefèvre",       email: "marie.lefevre@gmail.com", phone: "+33 6 78 90 12 34", phoneVerified: true,  budget: "450 000 €",   zone: "Paris 16e",         timeline: "1–3 mois",  projectType: "Résidence principale",     status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e",   createdAt: "2026-04-18T07:42:00Z", notes: "Recherche 3 pièces avec balcon. Budget flexible.",
+    { id: 1,  type: "buyer", initials: "ML", tone: "#A855F7", name: "Marie Lefèvre",       email: "marie.lefevre@gmail.com", phone: "+33 6 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", features: ["Style haussmannien", "Vue dégagée"], status: "qualified",     score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(0, 7, 42),  notes: "Recherche 3 pièces avec balcon. Budget flexible.",
       activity: [
         { type: "call",  at: "2026-04-18T10:15:00Z", by: 1 },
         { type: "email", at: "2026-04-18T10:40:00Z", by: 1 },
         { type: "note",  at: "2026-04-18T10:45:00Z", by: 1 },
       ] },
-    { id: 2,  type: "buyer",  initials: "PD", tone: "#0EA5E9", name: "Pierre Durand",        email: "p.durand@outlook.fr",    phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "320 000 €",   zone: "Neuilly",            timeline: "3–6 mois",  projectType: "Résidence principale",     status: "contacted",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Neuilly Familles",     createdAt: "2026-04-08T20:18:00Z", notes: "Premier achat. Besoin d'accompagnement financement.",
+    { id: 2,  type: "buyer", initials: "PD", tone: "#0EA5E9", name: "Pierre Durand",        email: "p.durand@outlook.fr",    phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Neuilly",   timeline: "Plus de 6 mois",           projectType: "Résidence principale", features: ["Autre"], status: "contacted",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Neuilly Familles",   createdAt: daysAgoISO(9, 20, 18), notes: "Premier achat. Besoin d'accompagnement financement.",
       activity: [
         { type: "call",  at: "2026-04-08T14:30:00Z", by: 2 },
       ] },
-    { id: 3,  type: "buyer",  initials: "SM", tone: "#6366F1", name: "Sophie Martin",        email: "smartin@free.fr",        phone: "+33 7 12 34 56 78", phoneVerified: false, budget: "680 000 €",   zone: "Paris 7e",           timeline: "Immédiat",  projectType: "Pied-à-terre",              status: "to_process",     score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",     createdAt: "2026-04-18T11:05:00Z", notes: "",
+    { id: 3,  type: "buyer", initials: "SM", tone: "#6366F1", name: "Sophie Martin",        email: "smartin@free.fr",        phone: "+33 7 12 34 56 78", phoneVerified: false, budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Immédiatement",            projectType: "Pied-à-terre",         features: ["Style haussmannien"], status: "to_process",     score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(0, 11, 5),  notes: "",
       activity: [] },
-    { id: 4,  type: "buyer",  initials: "JM", tone: "#14B8A6", name: "Jean-Baptiste Moreau", email: "jb.moreau@gmail.com",    phone: "+33 6 23 45 67 89", phoneVerified: true,  budget: "275 000 €",   zone: "Boulogne",           timeline: "6–12 mois", projectType: "Résidence principale",     status: "contacted",      score: "cold", source: "fb",     assignedAgentId: 1,    campaign: "Boulogne Actifs",      createdAt: "2026-04-07T12:47:00Z", notes: "Rappeler lundi matin. Intéressé par T2 avec parking.",
+    { id: 4,  type: "buyer", initials: "JM", tone: "#14B8A6", name: "Jean-Baptiste Moreau", email: "jb.moreau@gmail.com",    phone: "+33 6 23 45 67 89", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Boulogne",  timeline: "Plus de 6 mois",           projectType: "Résidence principale", features: ["Autre"], status: "contacted",      score: "cold", source: "fb",     assignedAgentId: 1,    campaign: "Boulogne Actifs",    createdAt: daysAgoISO(4, 12, 47), notes: "Rappeler lundi matin. Intéressé par T2 avec parking.",
       activity: [
         { type: "call", at: "2026-04-07T09:20:00Z", by: 1 },
       ] },
-    { id: 5,  type: "buyer",  initials: "CR", tone: "#F97316", name: "Camille Rousseau",     email: "camille.r@icloud.com",   phone: "+33 7 34 56 78 90", phoneVerified: true,  budget: "520 000 €",   zone: "Paris 8e",           timeline: "1–3 mois",  projectType: "Investissement patrimonial", status: "to_process",     score: "warm", source: "ig",     assignedAgentId: null, campaign: "Prestige Madeleine",   createdAt: "2026-04-18T15:22:00Z", notes: "Investissement locatif. Cherche rentabilité > 4%.",
+    { id: 5,  type: "buyer", initials: "CR", tone: "#F97316", name: "Camille Rousseau",     email: "camille.r@icloud.com",   phone: "+33 7 34 56 78 90", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 8e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",        features: ["Vue dégagée"], status: "to_process",     score: "warm", source: "ig",     assignedAgentId: null, campaign: "Prestige Madeleine", createdAt: daysAgoISO(0, 15, 22), notes: "Investissement locatif. Cherche rentabilité > 4%.",
       activity: [] },
-    { id: 6,  type: "buyer",  initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "895 000 €",   zone: "Paris 17e",          timeline: "1–3 mois",  projectType: "Résidence principale",     status: "visit_planned",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e",   createdAt: "2026-04-05T21:08:00Z", notes: "Visite prévue mercredi 14h.",
+    { id: 6,  type: "buyer", initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", features: ["Style haussmannien", "Vue dégagée"], status: "visit_planned",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e", createdAt: daysAgoISO(3, 21, 8),  notes: "Visite prévue mercredi 14h.",
       activity: [
         { type: "call",  at: "2026-04-05T11:00:00Z", by: 3 },
         { type: "email", at: "2026-04-06T16:20:00Z", by: 3 },
         { type: "note",  at: "2026-04-07T09:00:00Z", by: 3 },
       ] },
-    { id: 7,  type: "buyer",  initials: "IC", tone: "#8B5CF6", name: "Isabelle Chen",        email: "ichen@proton.me",        phone: "+33 7 56 78 90 12", phoneVerified: true,  budget: "850 000 €",   zone: "Paris 6e",           timeline: "Immédiat",  projectType: "Résidence principale",     status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",     createdAt: "2026-04-06T09:30:00Z", notes: "Expatriée, retour en France. Budget confortable.",
+    { id: 7,  type: "buyer", initials: "IC", tone: "#8B5CF6", name: "Isabelle Chen",        email: "ichen@proton.me",        phone: "+33 7 56 78 90 12", phoneVerified: true,  budget: "2M–4M",      secteur: "Rive gauche",        zone: "Paris 6e",  timeline: "Immédiatement",            projectType: "Résidence principale", features: ["Architecture contemporaine signée"], status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(1, 9, 30),  notes: "Expatriée, retour en France. Budget confortable.",
       activity: [
         { type: "call", at: "2026-04-06T15:30:00Z", by: 1 },
         { type: "note", at: "2026-04-06T16:00:00Z", by: 1 },
       ] },
-    { id: 8,  type: "buyer",  initials: "LF", tone: "#64748B", name: "Lucas Fontaine",       email: "l.fontaine@gmail.com",   phone: "+33 6 67 89 01 23", phoneVerified: false, budget: "195 000 €",   zone: "Paris 19e",          timeline: "6–12 mois", projectType: "Phase d'exploration",      status: "lost",           score: "cold", source: "web",    assignedAgentId: 2,    campaign: "—",                    createdAt: "2026-04-04T23:47:00Z", notes: "Budget insuffisant pour le secteur.",
+    { id: 8,  type: "buyer", initials: "LF", tone: "#64748B", name: "Lucas Fontaine",       email: "l.fontaine@gmail.com",   phone: "+33 6 67 89 01 23", phoneVerified: false, budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Paris 19e", timeline: "Plus de 6 mois",           projectType: "Pied-à-terre",         features: ["Autre"], status: "lost",           score: "cold", source: "web",    assignedAgentId: 2,    campaign: "—",                  createdAt: daysAgoISO(21, 23, 47), notes: "Budget insuffisant pour le secteur.",
       activity: [
         { type: "call", at: "2026-04-04T10:00:00Z", by: 2 },
         { type: "note", at: "2026-04-04T10:10:00Z", by: 2 },
       ] },
-    { id: 9,  type: "buyer",  initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "415 000 €",   zone: "Paris 11e",          timeline: "1–3 mois",  projectType: "Résidence principale",     status: "contacted",      score: "warm", source: "email",  assignedAgentId: null, campaign: "—",                    createdAt: "2026-04-08T19:15:00Z", notes: "Formulaire site web. Rappeler en soirée.",
+    { id: 9,  type: "buyer", initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", features: ["Autre"], status: "contacted",      score: "warm", source: "email",  assignedAgentId: null, campaign: "—",                  createdAt: daysAgoISO(6, 19, 15), notes: "Formulaire site web. Rappeler en soirée.",
       activity: [
         { type: "call", at: "2026-04-08T19:15:00Z", by: null },
       ] },
-    { id: 10, type: "buyer",  initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "1 200 000 €", zone: "Paris 16e",          timeline: "Immédiat",  projectType: "Résidence principale",     status: "offer_made",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e",   createdAt: "2026-04-07T10:12:00Z", notes: "Recherche hôtel particulier. Offre transmise mardi.",
+    { id: 10, type: "buyer", initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", features: ["Style haussmannien", "Vue dégagée"], status: "offer_made",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(5, 10, 12), notes: "Recherche hôtel particulier. Offre transmise mardi.",
       activity: [
         { type: "call",     at: "2026-04-07T09:30:00Z", by: 3 },
         { type: "email",    at: "2026-04-08T11:00:00Z", by: 3 },
@@ -2592,6 +2722,23 @@ function formatLeadDate(iso, opts) {
   return out;
 }
 
+/* V1 human date for the table Date column: Aujourd'hui / Hier / Il y a N
+   jours for the last week, terse "12 mai" beyond that. Relative to runtime
+   (see daysAgoISO on the dummy data). */
+function formatLeadDateHuman(iso) {
+  if (!iso) return "—";
+  const then = new Date(iso);
+  if (isNaN(then.getTime())) return iso;
+  const now = new Date();
+  const d0 = new Date(now.getFullYear(),  now.getMonth(),  now.getDate());
+  const d1 = new Date(then.getFullYear(), then.getMonth(), then.getDate());
+  const days = Math.round((d0 - d1) / 86400000);
+  if (days <= 0)  return "Aujourd'hui";
+  if (days === 1) return "Hier";
+  if (days < 7)   return `Il y a ${days} jours`;
+  return formatLeadDate(iso, { showYear: false });
+}
+
 /* Extract numeric budget for sort. budget/expectedPrice are formatted strings
    like "1 200 000 €" — strip non-digits and parse. Missing values sort last
    (returned Infinity in asc, -Infinity conceptually in desc via sign flip).
@@ -2622,6 +2769,8 @@ function leadComparator(column) {
   switch (column) {
     case "name":   return (a, b) => a.name.localeCompare(b.name,   "fr");
     case "budget": return (a, b) => leadPriceNumeric(a) - leadPriceNumeric(b);
+    case "secteur":return (a, b) => (a.secteur || "").localeCompare(b.secteur || "", "fr");
+    case "timing": return (a, b) => (TIMING_ORDER[leadTimeline(a)] || 0) - (TIMING_ORDER[leadTimeline(b)] || 0);
     case "zone":   return (a, b) => (a.zone || "").localeCompare(b.zone || "", "fr");
     case "score":  return (a, b) => leadScoreOrder(a) - leadScoreOrder(b);
     case "agent":  return (a, b) => leadAgentName(a).localeCompare(leadAgentName(b), "fr");
@@ -3074,7 +3223,23 @@ function computeLeadsView() {
    live in the KPI row below. */
 function renderLeadsModeCard() {
   const half = (typeKey, iconKey, label) => {
-    const active = state.leadType === typeKey;
+    const active   = state.leadType === typeKey;
+    // V1: Vendeurs is present but disabled — visible roadmap promise, not a
+    // working surface. Inert (no data-action so the click handler never
+    // fires) + "Bientôt disponible" tooltip. Seller code paths stay in file.
+    const disabled = typeKey === "seller";
+    if (disabled) {
+      return `
+      <div class="leads-mode-half leads-mode-half--disabled"
+           role="tab" aria-selected="false" aria-disabled="true"
+           data-action="seller-soon"
+           title="Bientôt disponible">
+        <span class="leads-mode-half-ico">${icon[iconKey]()}</span>
+        <span>${label}</span>
+        <span class="leads-mode-half-soon">Bientôt</span>
+      </div>
+    `;
+    }
     return `
       <button class="leads-mode-half"
               role="tab"
@@ -3297,14 +3462,21 @@ function renderStageCards(pipeline, stageCounts, activeStage, typeKey, allLeads)
 }
 
 /* Score chip: Chaud / Tiède / Froid with a colored dot. */
-function renderScoreChip(score) {
+function renderScoreChip(score, leadId) {
   const map = {
     hot:  { label: "Chaud", mod: "hot"  },
     warm: { label: "Tiède", mod: "warm" },
     cold: { label: "Froid", mod: "cold" },
   };
   const m = map[score] || { label: score || "—", mod: "none" };
-  return `<span class="score-chip score-chip--${m.mod}"><span class="score-chip-dot"></span>${m.label}</span>`;
+  const inner = `<span class="score-chip-dot"></span>${m.label}`;
+  // V1: when a leadId is passed, the chip is a click-to-cycle control
+  // (Chaud→Tiède→Froid), editable straight from the table/card. No modal,
+  // no save step — setState mutates the lead. The score IS the qualification.
+  if (leadId != null) {
+    return `<button class="score-chip score-chip--${m.mod} score-chip--editable" data-action="cycle-score" data-lead-id="${leadId}" title="Cliquer pour changer le score" aria-label="Score : ${m.label}. Cliquer pour changer.">${inner}</button>`;
+  }
+  return `<span class="score-chip score-chip--${m.mod}">${inner}</span>`;
 }
 
 /* Source icon: compact branded tile. Pure CSS + initial letter — we avoid
@@ -3398,14 +3570,11 @@ function renderColumnHeader(key, label, colClass) {
 function renderLeadRow(lead) {
   const selected     = state.drawer?.leadId === lead.id;
   const picked       = state.selectedLeadIds.includes(lead.id);
-  const agent        = lead.assignedAgentId != null
-    ? state.team.find(t => t.id === lead.assignedAgentId)
-    : null;
-  const agentCell    = agent
-    ? `<span class="leads-row-agent" title="${agent.name}">${renderAvatar(agent.initials, agent.tone, 26)}</span>`
-    : `<span class="leads-row-agent leads-row-agent--none" aria-label="Non assigné">—</span>`;
-  const zone         = lead.zone || "—";
-  const timeline     = leadTimeline(lead);
+  // V1 table: Nom · Budget · Secteur · Timing · Score · Date. Agent column
+  // removed (no assignment in V1; assignedAgentId stays in data for V2).
+  // Secteur and Timing are separate columns — never merged (Greg brief §3).
+  const secteur      = lead.secteur || "—";
+  const timing       = timingShort(leadTimeline(lead));
   const checkboxCell = state.selectionMode
     ? `<div class="leads-col leads-col--check"><span class="leads-checkbox ${picked ? "leads-checkbox--on" : ""}" aria-hidden="true">${picked ? icon.check() : ""}</span></div>`
     : "";
@@ -3423,11 +3592,11 @@ function renderLeadRow(lead) {
           <div class="leads-col-nom-email">${lead.email}</div>
         </div>
       </div>
-      <div class="leads-col leads-col--budget">${leadPrice(lead)}</div>
-      <div class="leads-col leads-col--zone">${zone}${timeline ? ` · ${timeline}` : ""}</div>
-      <div class="leads-col leads-col--score">${renderScoreChip(lead.score)}</div>
-      <div class="leads-col leads-col--agent">${agentCell}</div>
-      <div class="leads-col leads-col--date">${formatLeadDate(lead.createdAt)}</div>
+      <div class="leads-col leads-col--budget"><span class="budget-tag">${leadPrice(lead)}</span></div>
+      <div class="leads-col leads-col--secteur">${secteur}</div>
+      <div class="leads-col leads-col--timing">${timing}</div>
+      <div class="leads-col leads-col--score">${renderScoreChip(lead.score, lead.id)}</div>
+      <div class="leads-col leads-col--date">${formatLeadDateHuman(lead.createdAt)}</div>
     </div>
   `;
 }
@@ -3495,7 +3664,7 @@ function renderLeadCard(lead) {
       <div class="leads-card-content">
         <div class="leads-card-row1">
           <div class="leads-card-name">${lead.name}</div>
-          ${renderScoreChip(lead.score)}
+          ${renderScoreChip(lead.score, lead.id)}
         </div>
         <div class="leads-card-summary">${leadPrice(lead)} · ${zone}${timeline ? ` · ${timeline}` : ""}</div>
         <div class="leads-card-meta">
@@ -3581,12 +3750,12 @@ function renderLeadsTable(view) {
       : `
         <div class="leads-table-head${state.selectionMode ? " leads-table-head--selectable" : ""}" role="row">
           ${checkHead}
-          ${renderColumnHeader("name",   "Nom",    "leads-col--nom")}
-          ${renderColumnHeader("budget", "Budget", "leads-col--budget")}
-          ${renderColumnHeader("zone",   "Zone",   "leads-col--zone")}
-          ${renderColumnHeader("score",  "Score",  "leads-col--score")}
-          ${renderColumnHeader("agent",  "Agent",  "leads-col--agent")}
-          ${renderColumnHeader("date",   "Date",   "leads-col--date")}
+          ${renderColumnHeader("name",    "Nom",     "leads-col--nom")}
+          ${renderColumnHeader("budget",  "Budget",  "leads-col--budget")}
+          ${renderColumnHeader("secteur", "Secteur", "leads-col--secteur")}
+          ${renderColumnHeader("timing",  "Timing",  "leads-col--timing")}
+          ${renderColumnHeader("score",   "Score",   "leads-col--score")}
+          ${renderColumnHeader("date",    "Date",    "leads-col--date")}
         </div>
         <div class="leads-table-body${state.selectionMode ? " leads-table-body--selectable" : ""}" role="rowgroup">
           ${view.visible.map(renderLeadRow).join("")}
@@ -3637,7 +3806,6 @@ function renderLeadsContent() {
         ${renderLeadsContextChip(state.leadType, typeCount)}
         <span class="leads-updated-meta">Mis à jour il y a 2 min</span>
       </div>
-      ${renderStageCards(view.pipeline, view.counts.stageCounts, state.filterTab, state.leadType, view.leadsInType)}
       ${renderLeadsTable(view)}
     </div>
   `;
@@ -3672,7 +3840,7 @@ function renderRouteComingSoon() {
         <div class="empty-state-title">${title}</div>
         <div class="empty-state-body">Page à construire. Cette section sera implémentée après l'étape 2 (Leads) et l'étape 3 (tiroir).</div>
       </div>
-      <div class="empty-state-chip">v0.10.5</div>
+      <div class="empty-state-chip">v0.11.1</div>
     </div>
   `;
 }
@@ -3944,6 +4112,24 @@ document.addEventListener("click", (e) => {
       setState({ leadsSort: next });
       break;
     }
+    case "cycle-score": {
+      // V1: click the score badge to cycle Chaud → Tiède → Froid, straight
+      // from the table/card. Auto-save = mutate the lead + re-render. No
+      // modal, no save step (Greg brief §3). Stops here so the row's
+      // row-click (open drawer / toggle select) does NOT also fire — the
+      // closest [data-action] is this button, so dispatch lands here only.
+      const id = Number(target.getAttribute("data-lead-id"));
+      const lead = state.leads.find(l => l.id === id);
+      if (lead) {
+        const i = SCORE_CYCLE.indexOf(lead.score);
+        lead.score = SCORE_CYCLE[(i + 1) % SCORE_CYCLE.length];
+        setState({});  // re-render with mutated lead
+      }
+      break;
+    }
+    case "seller-soon":
+      // V1: Vendeurs half is disabled. Inert by design — no state change.
+      break;
     case "toggle-select-mode": {
       // Entering: turn the checkbox column on. Leaving: also clear selection —
       // matches the mental model that "Annuler" means "cancel this operation".
