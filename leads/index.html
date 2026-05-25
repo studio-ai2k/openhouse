@@ -1,34 +1,54 @@
 <!doctype html>
 <!--
-  Open House Leads — v0.11.1
-  V1 table surgery (Greg lean direction). Build contract: V1_SCOPE.md.
+  Open House Leads — v0.11.3
+  Audit absorption (housekeeping). No behaviour change vs v0.11.2.
+    - Removed dead CSS stranded by the v0.11.2 drawer rebuild: .drawer-placeholder,
+      .drawer-footer (incl. mobile @media).
+    - Labelled the now-dormant-for-V2 code per the §13 dead-code discipline:
+      renderButton (no call sites since the footer was removed),
+      renderActivityBadges + ACTIVITY_* maps + .leads-card-activity /
+      .activity-badge / .leads-card--untouched CSS (replaced by attribute icons).
+    - Docs: V1_SCOPE §2.4/§2.5 reordered (were out of sequence); DESIGN_SPEC
+      drawer section tagged as V2-reference with a V1 pointer; HANDOFF §3 stale
+      "drawer placeholder" line corrected to the shipped 3-tab Centre d'action.
+    - Version bumped across HANDOFF / header / chip / CHANGELOG / zip.
 
-  v0.11.0 was the docs-only pivot cycle (scope change recorded; app untouched).
-  v0.11.1 is the first V1 APP change — the table surgery:
-    - Columns: Nom · Budget · Secteur · Timing · Score · Date.
-      Agent column removed (assignedAgentId kept in data for V2).
-      Secteur and Timing are separate columns (never merged).
-    - Budget renders as a tag; tiers re-bracketed to luxury
-      (Moins de 1M / 1M-2M / 2M-4M / 4M+).
-    - Date renders human (Aujourd'hui / Hier / Il y a N jours / terse beyond).
-      Dummy createdAt anchored to runtime via daysAgoISO so it always demos.
-    - Score is a click-to-cycle badge (Chaud→Tiède→Froid), auto-save, no modal.
-      Editable from the table row AND the mobile card. Score IS the V1 qual.
-    - Stage-KPI filter row dropped (no pipeline stages in V1). renderStageCards
-      kept in file, just not called — V2 re-enables.
-    - Vendeurs toggle greyed/inert with a "Bientôt" tag (leadType stays buyer).
-    - Buyer dummy data re-shaped to Greg's Magrey form (secteur groupings,
-      Greg's timing/projet options, features[]). Sellers left dormant/unchanged.
+  Open House Leads — v0.11.2
+  V1 drawer rebuild + mobile card icons. Build contract: V1_SCOPE.md.
+
+  v0.11.2 — the "Centre d'action" drawer + mobile attribute icons:
+    - Drawer rebuilt to 3 TABS: Infos · Messages rapides · Notes (Activité gone).
+      NB: 3 tabs is a DELIBERATE DEPARTURE from Greg's "no tabs" brief — Leo's
+      call as product owner (revenue stake). See HANDOFF decision 26, V1_SCOPE
+      §2.3, CHANGELOG v0.11.2. Greg's no-tabs preference kept as original intent.
+    - Infos tab: lead detail (Budget/Secteur/Timing/Projet/Caractéristiques) +
+      qualification chips (Chaud/Tiède/Froid) writing the SAME lead.score the
+      table cycles. Header (name/phone/email) unchanged, so no contact dup.
+    - Messages rapides tab: Appeler (tel:) / WhatsApp (wa.me) / Email (mailto:
+      w/ subject) / Copier (clipboard). Templates hardcoded verbatim from the
+      brief; merged [Prénom]/[Nom de l'agence] on tap; handed to device app
+      (no in-drawer editor — edit happens in the mail/WhatsApp app).
+    - Notes tab: one plain textarea, saved silently on input (no re-render →
+      keeps focus). Old drawer footer removed (its actions moved to Messages).
+    - Mobile card: action badges (off the deferred activity[]) REPLACED by 4
+      data-verified attribute icons — note present / phone verified / contact
+      "Tout de suite" / has features — black when true, muted when absent.
+      Resolves the v0.11.1 carry-over. renderActivityBadges kept dormant.
+    - Data: contactPreference added to buyer leads (~1/3 "Tout de suite").
+
+  --- earlier in the V1 line ---
+  v0.11.0 = docs-only pivot cycle. v0.11.1 = table surgery (columns
+  Nom·Budget·Secteur·Timing·Score·Date, budget tags, human dates, click-cycle
+  score, Vendeurs greyed, Magrey dummy data).
 
   Still V2 (preserved, not deleted): pipeline, agents, other pages, CAPI,
   drawer Activité/timeline, multi-tenancy UI. See PROJECT_SUMMARY.md, HANDOFF
   §11, PARKED.md. Source brief: openhouse_V1_brief.pdf (zip root).
 
   --- still to come in the V1 line ---
-    drawer : collapse 4 tabs -> single "Centre d'action" (Infos / Messages
-             rapides / Qualification rapide / Notes).   [next cycle]
-    polish : H1 prefix still reads "Prospects ·" (line ~3210) — French wording
-             decision (Prospects vs Leads) left for Leo; nav already says "Leads".
+    polish : H1 prefix still reads "Prospects ·" — French wording decision
+             (Prospects vs Leads) left for Leo; nav already says "Leads".
+             Default sort date-desc still pending.
 
   === prior cycle: v0.10.6 — Report content refresh (master-zip lockstep) ===
 
@@ -1257,31 +1277,116 @@
     overflow-y: auto;
     background: var(--surface-tint);
   }
-  .drawer-placeholder {
-    padding: 28px 20px;
-    border: 1px dashed var(--border-divider);
-    border-radius: var(--r-md);
-    background: var(--panel);
-    text-align: center;
+
+  /* ── v0.11.2 — Centre d'action drawer body (3 tabs) ──────────────── */
+  .drawer-section { margin-bottom: 22px; }
+  .drawer-section:last-child { margin-bottom: 0; }
+  .drawer-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     color: var(--text-muted);
-    font-size: 13px;
-    line-height: 1.6;
+    margin-bottom: 10px;
   }
-  .drawer-placeholder strong {
-    display: block;
+  .drawer-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .drawer-info-row:last-child { border-bottom: none; }
+  .drawer-info-label {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .drawer-info-value {
+    font-size: 13px;
     color: var(--text-secondary);
-    margin-bottom: 4px;
-    font-size: 14px;
+    text-align: right;
+    font-weight: 500;
   }
 
-  .drawer-footer {
-    padding: 14px 24px;
-    border-top: 1px solid var(--border-subtle);
-    display: flex;
-    gap: 10px;
+  /* Qualification chips — coloured, selectable; reuse score-chip palette */
+  .qual-chips { display: flex; gap: 8px; }
+  .qual-chip {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 8px;
+    border: 1px solid var(--border-divider);
+    border-radius: var(--r-md);
     background: var(--panel);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
   }
-  .drawer-footer .btn { flex: 1; }
+  .qual-chip:hover { border-color: var(--border-strong); }
+  .qual-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: 0.55; }
+  .qual-chip--on .qual-chip-dot { opacity: 1; }
+  .qual-chip--hot.qual-chip--on  { background: #FCEBEB; color: #A32D2D; border-color: #E24B4A; }
+  .qual-chip--warm.qual-chip--on { background: #FAEEDA; color: #854F0B; border-color: #F5B94C; }
+  .qual-chip--cold.qual-chip--on { background: #E6F1FB; color: #0C447C; border-color: #85B7EB; }
+
+  /* Messages rapides — 4 action buttons + hint */
+  .msg-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .msg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 13px 12px;
+    border: 1px solid var(--border-divider);
+    border-radius: var(--r-md);
+    background: var(--panel);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .msg-btn:hover { background: var(--surface-tint); border-color: var(--border-strong); }
+  .msg-btn svg { width: 17px; height: 17px; }
+  .msg-btn--wa { color: #1F8F5F; }
+  .msg-btn--wa:hover { background: #E9F7EF; border-color: #57BD8C; }
+  .msg-hint {
+    margin: 14px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
+  /* Notes — single plain textarea */
+  .notes-field {
+    width: 100%;
+    min-height: 200px;
+    resize: vertical;
+    padding: 12px 14px;
+    border: 1px solid var(--border-divider);
+    border-radius: var(--r-md);
+    background: var(--panel);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.6;
+    box-sizing: border-box;
+  }
+  .notes-field:focus { outline: none; border-color: var(--border-strong); }
+  .notes-field::placeholder { color: var(--text-muted); }
 
   /* ═══════════════════════════════════════════════════════════════
      LEADS PAGE — v0.7.0 controls + card list
@@ -1922,10 +2027,12 @@
   .leads-card--picked { background: var(--blue-soft); }
   .leads-card[data-selected="true"] { background: var(--blue-soft); }
 
-  /* Left accent bar — inserted via ::before so it's one rule, paints
-     inside the card's left padding. Only visible when lead is untouched
-     (no activity entries). Uses --type-accent so it re-palettes with
-     the buyer/seller toggle. */
+  /* DORMANT in V1 (v0.11.2): the .leads-card--untouched class is no longer
+     applied — "untouched" depended on lead.activity[], which V1 defers (see
+     V1_SCOPE §2.5 / §5). Rule kept for V2 when the activity model returns.
+     Left accent bar — inserted via ::before so it's one rule, paints
+     inside the card's left padding. Uses --type-accent so it re-palettes
+     with the buyer/seller toggle. */
   .leads-card--untouched::before {
     content: "";
     position: absolute;
@@ -1998,12 +2105,12 @@
   }
   .leads-card-date { font-variant-numeric: tabular-nums; }
 
-  /* Activity badge stack — right column, top-aligned, vertical. Shows
-     one badge per distinct activity type present on the lead (call,
-     email, whatsapp, note). Outline-only done style: muted grey border,
-     muted icon, transparent fill. Sits quietly alongside the name /
-     score chip without competing. Not clickable — card-level tap
-     handles everything. */
+  /* DORMANT in V1 (v0.11.2): .leads-card-activity + .activity-badge* are no
+     longer emitted — renderLeadCard now renders .leads-card-attrs (four
+     attribute icons) instead. Kept for V2 alongside renderActivityBadges()
+     (see V1_SCOPE §2.5). Activity badge stack — right column, top-aligned,
+     vertical. Shows one badge per distinct activity type present on the lead
+     (call, email, whatsapp, note). Outline-only done style; not clickable. */
   .leads-card-activity {
     display: flex;
     flex-direction: column;
@@ -2013,6 +2120,28 @@
     width: 20px;
     padding-top: 2px;
   }
+
+  /* v0.11.2 — attribute icon stack (replaces activity badges in V1).
+     Four data-verified icons, black when true / muted when absent. No
+     border/circle — lighter than the old badges; reads as a quiet
+     glance column. Not clickable; card tap handles everything. */
+  .leads-card-attrs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    width: 18px;
+    padding-top: 2px;
+  }
+  .attr-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .attr-icon svg { width: 15px; height: 15px; }
+  .attr-icon--on  { color: var(--text-primary); }
+  .attr-icon--off { color: var(--border-divider); }
   /* v0.10.2 — badges now ALWAYS show all 4 action types per lead.
      .activity-badge--done: action has been taken. Solid border, muted
        secondary color — reads as "checked off."
@@ -2382,10 +2511,6 @@
     }
     .drawer-tab { white-space: nowrap; }
     .drawer-body { padding: 16px; }
-    .drawer-footer {
-      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-      gap: 8px;
-    }
     /* On mobile: close button stays on the LEFT (native iOS/Android back pattern)
        and renders as a back-arrow. Reset the desktop order:2 that pushes it right. */
     .drawer-close { order: 0; }
@@ -2490,7 +2615,7 @@ const state = {
   sidebarOpen: false,        // mobile only
   agencySwitcherOpen: false, // sidebar dropdown
   userMenuOpen: false,       // topbar dropdown
-  drawer: null,              // null | { leadId, tab: "infos"|"qualification"|"activite"|"notes" }
+  drawer: null,              // null | { leadId, tab: "infos"|"messages"|"notes" }  (v0.11.2: was infos/qualification/activite/notes)
 
   // Leads page state — consumed by the toggle, page search, filter tabs,
   // and pipeline bar. Lives at state root (not on state.route) so filter
@@ -2554,45 +2679,45 @@ const state = {
   // both compare against iso.slice(0, 10), so the date-portion logic
   // is unchanged — only the display layer gained time.
   leads: [
-    { id: 1,  type: "buyer", initials: "ML", tone: "#A855F7", name: "Marie Lefèvre",       email: "marie.lefevre@gmail.com", phone: "+33 6 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", features: ["Style haussmannien", "Vue dégagée"], status: "qualified",     score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(0, 7, 42),  notes: "Recherche 3 pièces avec balcon. Budget flexible.",
+    { id: 1,  type: "buyer", initials: "ML", tone: "#A855F7", name: "Marie Lefèvre",       email: "marie.lefevre@gmail.com", phone: "+33 6 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "qualified",     score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(0, 7, 42),  notes: "Recherche 3 pièces avec balcon. Budget flexible.",
       activity: [
         { type: "call",  at: "2026-04-18T10:15:00Z", by: 1 },
         { type: "email", at: "2026-04-18T10:40:00Z", by: 1 },
         { type: "note",  at: "2026-04-18T10:45:00Z", by: 1 },
       ] },
-    { id: 2,  type: "buyer", initials: "PD", tone: "#0EA5E9", name: "Pierre Durand",        email: "p.durand@outlook.fr",    phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Neuilly",   timeline: "Plus de 6 mois",           projectType: "Résidence principale", features: ["Autre"], status: "contacted",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Neuilly Familles",   createdAt: daysAgoISO(9, 20, 18), notes: "Premier achat. Besoin d'accompagnement financement.",
+    { id: 2,  type: "buyer", initials: "PD", tone: "#0EA5E9", name: "Pierre Durand",        email: "p.durand@outlook.fr",    phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Neuilly",   timeline: "Plus de 6 mois",           projectType: "Résidence principale", contactPreference: "Dans un mois", features: ["Autre"], status: "contacted",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Neuilly Familles",   createdAt: daysAgoISO(9, 20, 18), notes: "Premier achat. Besoin d'accompagnement financement.",
       activity: [
         { type: "call",  at: "2026-04-08T14:30:00Z", by: 2 },
       ] },
-    { id: 3,  type: "buyer", initials: "SM", tone: "#6366F1", name: "Sophie Martin",        email: "smartin@free.fr",        phone: "+33 7 12 34 56 78", phoneVerified: false, budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Immédiatement",            projectType: "Pied-à-terre",         features: ["Style haussmannien"], status: "to_process",     score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(0, 11, 5),  notes: "",
+    { id: 3,  type: "buyer", initials: "SM", tone: "#6366F1", name: "Sophie Martin",        email: "smartin@free.fr",        phone: "+33 7 12 34 56 78", phoneVerified: false, budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Immédiatement",            projectType: "Pied-à-terre", contactPreference: "Dans un mois",         features: ["Style haussmannien"], status: "to_process",     score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(0, 11, 5),  notes: "",
       activity: [] },
-    { id: 4,  type: "buyer", initials: "JM", tone: "#14B8A6", name: "Jean-Baptiste Moreau", email: "jb.moreau@gmail.com",    phone: "+33 6 23 45 67 89", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Boulogne",  timeline: "Plus de 6 mois",           projectType: "Résidence principale", features: ["Autre"], status: "contacted",      score: "cold", source: "fb",     assignedAgentId: 1,    campaign: "Boulogne Actifs",    createdAt: daysAgoISO(4, 12, 47), notes: "Rappeler lundi matin. Intéressé par T2 avec parking.",
+    { id: 4,  type: "buyer", initials: "JM", tone: "#14B8A6", name: "Jean-Baptiste Moreau", email: "jb.moreau@gmail.com",    phone: "+33 6 23 45 67 89", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Boulogne",  timeline: "Plus de 6 mois",           projectType: "Résidence principale", contactPreference: "Pas pour le moment", features: ["Autre"], status: "contacted",      score: "cold", source: "fb",     assignedAgentId: 1,    campaign: "Boulogne Actifs",    createdAt: daysAgoISO(4, 12, 47), notes: "Rappeler lundi matin. Intéressé par T2 avec parking.",
       activity: [
         { type: "call", at: "2026-04-07T09:20:00Z", by: 1 },
       ] },
-    { id: 5,  type: "buyer", initials: "CR", tone: "#F97316", name: "Camille Rousseau",     email: "camille.r@icloud.com",   phone: "+33 7 34 56 78 90", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 8e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",        features: ["Vue dégagée"], status: "to_process",     score: "warm", source: "ig",     assignedAgentId: null, campaign: "Prestige Madeleine", createdAt: daysAgoISO(0, 15, 22), notes: "Investissement locatif. Cherche rentabilité > 4%.",
+    { id: 5,  type: "buyer", initials: "CR", tone: "#F97316", name: "Camille Rousseau",     email: "camille.r@icloud.com",   phone: "+33 7 34 56 78 90", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 8e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre", contactPreference: "Dans un mois",        features: ["Vue dégagée"], status: "to_process",     score: "warm", source: "ig",     assignedAgentId: null, campaign: "Prestige Madeleine", createdAt: daysAgoISO(0, 15, 22), notes: "Investissement locatif. Cherche rentabilité > 4%.",
       activity: [] },
-    { id: 6,  type: "buyer", initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", features: ["Style haussmannien", "Vue dégagée"], status: "visit_planned",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e", createdAt: daysAgoISO(3, 21, 8),  notes: "Visite prévue mercredi 14h.",
+    { id: 6,  type: "buyer", initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "visit_planned",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e", createdAt: daysAgoISO(3, 21, 8),  notes: "Visite prévue mercredi 14h.",
       activity: [
         { type: "call",  at: "2026-04-05T11:00:00Z", by: 3 },
         { type: "email", at: "2026-04-06T16:20:00Z", by: 3 },
         { type: "note",  at: "2026-04-07T09:00:00Z", by: 3 },
       ] },
-    { id: 7,  type: "buyer", initials: "IC", tone: "#8B5CF6", name: "Isabelle Chen",        email: "ichen@proton.me",        phone: "+33 7 56 78 90 12", phoneVerified: true,  budget: "2M–4M",      secteur: "Rive gauche",        zone: "Paris 6e",  timeline: "Immédiatement",            projectType: "Résidence principale", features: ["Architecture contemporaine signée"], status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(1, 9, 30),  notes: "Expatriée, retour en France. Budget confortable.",
+    { id: 7,  type: "buyer", initials: "IC", tone: "#8B5CF6", name: "Isabelle Chen",        email: "ichen@proton.me",        phone: "+33 7 56 78 90 12", phoneVerified: true,  budget: "2M–4M",      secteur: "Rive gauche",        zone: "Paris 6e",  timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Architecture contemporaine signée"], status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(1, 9, 30),  notes: "Expatriée, retour en France. Budget confortable.",
       activity: [
         { type: "call", at: "2026-04-06T15:30:00Z", by: 1 },
         { type: "note", at: "2026-04-06T16:00:00Z", by: 1 },
       ] },
-    { id: 8,  type: "buyer", initials: "LF", tone: "#64748B", name: "Lucas Fontaine",       email: "l.fontaine@gmail.com",   phone: "+33 6 67 89 01 23", phoneVerified: false, budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Paris 19e", timeline: "Plus de 6 mois",           projectType: "Pied-à-terre",         features: ["Autre"], status: "lost",           score: "cold", source: "web",    assignedAgentId: 2,    campaign: "—",                  createdAt: daysAgoISO(21, 23, 47), notes: "Budget insuffisant pour le secteur.",
+    { id: 8,  type: "buyer", initials: "LF", tone: "#64748B", name: "Lucas Fontaine",       email: "l.fontaine@gmail.com",   phone: "+33 6 67 89 01 23", phoneVerified: false, budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Paris 19e", timeline: "Plus de 6 mois",           projectType: "Pied-à-terre", contactPreference: "Pas pour le moment",         features: ["Autre"], status: "lost",           score: "cold", source: "web",    assignedAgentId: 2,    campaign: "—",                  createdAt: daysAgoISO(21, 23, 47), notes: "Budget insuffisant pour le secteur.",
       activity: [
         { type: "call", at: "2026-04-04T10:00:00Z", by: 2 },
         { type: "note", at: "2026-04-04T10:10:00Z", by: 2 },
       ] },
-    { id: 9,  type: "buyer", initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", features: ["Autre"], status: "contacted",      score: "warm", source: "email",  assignedAgentId: null, campaign: "—",                  createdAt: daysAgoISO(6, 19, 15), notes: "Formulaire site web. Rappeler en soirée.",
+    { id: 9,  type: "buyer", initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Dans un mois", features: ["Autre"], status: "contacted",      score: "warm", source: "email",  assignedAgentId: null, campaign: "—",                  createdAt: daysAgoISO(6, 19, 15), notes: "Formulaire site web. Rappeler en soirée.",
       activity: [
         { type: "call", at: "2026-04-08T19:15:00Z", by: null },
       ] },
-    { id: 10, type: "buyer", initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", features: ["Style haussmannien", "Vue dégagée"], status: "offer_made",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(5, 10, 12), notes: "Recherche hôtel particulier. Offre transmise mardi.",
+    { id: 10, type: "buyer", initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "offer_made",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(5, 10, 12), notes: "Recherche hôtel particulier. Offre transmise mardi.",
       activity: [
         { type: "call",     at: "2026-04-07T09:30:00Z", by: 3 },
         { type: "email",    at: "2026-04-08T11:00:00Z", by: 3 },
@@ -2845,6 +2970,10 @@ const icon = {
 
   // v0.10.1 — drawer header additions (Leo's locked spec)
   alertTriangle: () => svg(`<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17.01" x2="12" y2="17"/>`),
+
+  // v0.11.2 — mobile attribute icons + drawer "Copier" action
+  star:        () => svg(`<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`),
+  copy:        () => svg(`<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>`),
 };
 function svg(body, size=24) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -3073,6 +3202,11 @@ function renderAvatar(init, tone, size=28) {
  *   action:  data-action value to dispatch on click
  *   disabled: boolean
  *   extra:   additional class names (rare)
+ *
+ * DORMANT in V1 (since v0.11.2): no current call sites — the drawer footer
+ * (its last consumer) was removed when the Centre d'action moved its actions
+ * into the Messages rapides tab. Kept as the generic button primitive for V2
+ * forms / re-enabled surfaces. See V1_SCOPE §8 (V2 = re-enable, not rebuild).
  */
 function renderButton({ variant = "default", size = "md", block = false, icon = "", label = "", action = "", disabled = false, extra = "" } = {}) {
   const classes = [
@@ -3601,7 +3735,11 @@ function renderLeadRow(lead) {
   `;
 }
 
-/* Activity badges (v0.10.2 update). Returns HTML for the vertical stack
+/* DORMANT in V1 (since v0.11.2): renderActivityBadges + the ACTIVITY_* maps
+   are no longer called — renderAttributeIcons replaced the mobile badges (the
+   action model couldn't be truthful in V1; see V1_SCOPE §2.5). Kept in-file
+   for V2 when lead.activity[] returns.
+   Activity badges (v0.10.2 update). Returns HTML for the vertical stack
    of outline badges on the mobile card's right side. ALL 4 badges always
    render — done types get the full-stroke treatment, not-yet-done types
    get a muted dashed-border treatment. This gives the agent a glance
@@ -3628,6 +3766,27 @@ function renderActivityBadges(activity) {
     .join("");
 }
 
+/* Mobile card attribute icons (v0.11.2) — replaces renderActivityBadges in
+   V1. Action badges read off the deferred lead.activity[] and couldn't be
+   truthful (no send-callback from mailto:/wa.me). These four icons read off
+   VERIFIABLE data and light black when true, muted when absent:
+     • note present       — lead.notes non-empty
+     • phone verified      — lead.phoneVerified
+     • contact urgency     — lead.contactPreference === "Tout de suite"
+     • specific criteria   — lead.features[] non-empty
+   See V1_SCOPE §2.5. renderActivityBadges + activity[] kept dormant for V2. */
+function renderAttributeIcons(lead) {
+  const attrs = [
+    { on: !!(lead.notes && lead.notes.trim()),            iconKey: "fileText", label: "Note présente" },
+    { on: !!lead.phoneVerified,                           iconKey: "check",    label: "Téléphone vérifié" },
+    { on: lead.contactPreference === "Tout de suite",     iconKey: "bell",     label: "À contacter tout de suite" },
+    { on: !!(lead.features && lead.features.length),      iconKey: "star",     label: "Critères spécifiques" },
+  ];
+  return attrs
+    .map(a => `<span class="attr-icon ${a.on ? "attr-icon--on" : "attr-icon--off"}" title="${a.label}" aria-label="${a.label}${a.on ? "" : " : non"}">${icon[a.iconKey]()}</span>`)
+    .join("");
+}
+
 /* Mobile lead card (v0.10.0) — renders when viewport ≤ 600px (CSS swaps
    which of .leads-table-body / .leads-cards-list is visible).
 
@@ -3649,12 +3808,11 @@ function renderLeadCard(lead) {
   const picked   = state.selectedLeadIds.includes(lead.id);
   const zone     = lead.zone || "—";
   const timeline = leadTimeline(lead);
-  const untouched = !lead.activity || lead.activity.length === 0;
   const checkbox = state.selectionMode
     ? `<span class="leads-card-checkbox ${picked ? "leads-card-checkbox--on" : ""}" aria-hidden="true">${picked ? icon.check() : ""}</span>`
     : "";
   return `
-    <div class="leads-card${picked ? " leads-card--picked" : ""}${untouched ? " leads-card--untouched" : ""}"
+    <div class="leads-card${picked ? " leads-card--picked" : ""}"
          data-action="row-click"
          data-lead-id="${lead.id}"
          data-selected="${selected}"
@@ -3672,7 +3830,7 @@ function renderLeadCard(lead) {
           <span class="leads-card-date">${formatLeadDate(lead.createdAt, { showYear: false, longMonth: true, showTime: true })}</span>
         </div>
       </div>
-      <div class="leads-card-activity">${renderActivityBadges(lead.activity)}</div>
+      <div class="leads-card-attrs">${renderAttributeIcons(lead)}</div>
     </div>
   `;
 }
@@ -3840,7 +3998,7 @@ function renderRouteComingSoon() {
         <div class="empty-state-title">${title}</div>
         <div class="empty-state-body">Page à construire. Cette section sera implémentée après l'étape 2 (Leads) et l'étape 3 (tiroir).</div>
       </div>
-      <div class="empty-state-chip">v0.11.1</div>
+      <div class="empty-state-chip">v0.11.3</div>
     </div>
   `;
 }
@@ -3850,31 +4008,147 @@ function isMobile() {
   return window.matchMedia("(max-width: 768px)").matches;
 }
 
+/* ── Messages rapides — default templates (v0.11.2) ─────────────────────
+   Transcribed VERBATIM from Greg's V1 brief (openhouse_V1_brief.pdf §5).
+   Merge fields [Prénom] / [Nom de l'agence] are substituted at tap time by
+   mergeTemplate(). Per V1_SCOPE §2.3 there is no in-drawer editor: the
+   merged text is handed to the device app (wa.me / mailto:) where the agent
+   edits before sending, or copied to clipboard. "Template" is internal-only
+   wording — the UI says "Messages rapides". */
+const MSG_WHATSAPP =
+  "Bonjour [Prénom], nous avons bien reçu votre demande concernant votre recherche immobilière à Paris.\n\n" +
+  "Nous avons essayé de vous joindre afin d'échanger sur votre projet et les biens actuellement disponibles.\n\n" +
+  "N'hésitez pas à nous rappeler ou à nous répondre directement ici afin que nous puissions en discuter.\n\n" +
+  "Bien à vous,\n[Nom de l'agence]";
+const MSG_EMAIL_SUBJECT = "Votre recherche immobilière à Paris";
+const MSG_EMAIL_BODY =
+  "Bonjour [Prénom],\n\n" +
+  "Nous avons bien reçu votre demande concernant votre recherche immobilière à Paris.\n\n" +
+  "Nous avons essayé de vous joindre afin d'échanger sur votre projet et les biens actuellement disponibles.\n\n" +
+  "N'hésitez pas à nous répondre ou à nous rappeler afin que nous puissions en discuter plus en détail.\n\n" +
+  "Bien à vous,\n[Nom de l'agence]";
+
+function mergeTemplate(tpl, lead) {
+  const prenom = (lead.name || "").trim().split(/\s+/)[0] || "";
+  return tpl
+    .replace(/\[Prénom\]/g, prenom)
+    .replace(/\[Nom de l'agence\]/g, state.agency.name);
+}
+/* Phone → wa.me digits (E.164 without the +). */
+function waDigits(phone) { return (phone || "").replace(/\D/g, ""); }
+
+/* Qualification chips (v0.11.2) — Chaud/Tiède/Froid as coloured selectable
+   chips inside the drawer Infos tab. Writes the SAME lead.score the table
+   cycles (V1_SCOPE §2.3). Active chip = current score; tap sets it directly
+   (data-action="set-score"). Chosen over a dropdown to honour Greg's
+   "visuel + couleur" and stay consistent with the table score badge. */
+function renderQualChips(lead) {
+  const opts = [
+    { v: "hot",  label: "Chaud", mod: "hot"  },
+    { v: "warm", label: "Tiède", mod: "warm" },
+    { v: "cold", label: "Froid", mod: "cold" },
+  ];
+  return `
+    <div class="qual-chips" role="group" aria-label="Qualification rapide">
+      ${opts.map(o => `
+        <button class="qual-chip qual-chip--${o.mod} ${lead.score === o.v ? "qual-chip--on" : ""}"
+                data-action="set-score"
+                data-lead-id="${lead.id}"
+                data-score="${o.v}"
+                aria-pressed="${lead.score === o.v}">
+          <span class="qual-chip-dot"></span>${o.label}
+        </button>
+      `).join("")}
+    </div>`;
+}
+
+/* Infos tab row helper. */
+function drawerInfoRow(label, value) {
+  return `
+    <div class="drawer-info-row">
+      <span class="drawer-info-label">${label}</span>
+      <span class="drawer-info-value">${value || "—"}</span>
+    </div>`;
+}
+
 function renderDrawer() {
   // Mounted conditionally — only renders the DOM when state.drawer is set.
   // Sliding animation handled by the data-open attribute on the container.
-  // Opened from the Leads page by clicking a lead card (data-action="open-drawer").
+  // v0.11.2 — rebuilt into the "Centre d'action": 3 tabs (Infos / Messages
+  // rapides / Notes), no Activité. The 3-tab structure is a deliberate
+  // departure from Greg's "no tabs" brief — Leo's call as product owner
+  // (HANDOFF decision 26, V1_SCOPE §2.3). Header is unchanged (locked
+  // v0.10.1 spec). Old drawer footer removed — its actions live in the
+  // Messages rapides tab now.
   if (!state.drawer) return "";
   const lead = state.leads.find(l => l.id === state.drawer.leadId);
   if (!lead) return "";
-  const activeTab = state.drawer.tab;
+  const activeTab = (state.drawer.tab === "messages" || state.drawer.tab === "notes")
+    ? state.drawer.tab : "infos";
   const tabs = [
-    { id: "infos",         label: "Infos" },
-    { id: "qualification", label: "Qualification" },
-    { id: "activite",      label: "Activité" },
-    { id: "notes",         label: "Notes" },
+    { id: "infos",    label: "Infos" },
+    { id: "messages", label: "Messages rapides" },
+    { id: "notes",    label: "Notes" },
   ];
   const statusC = stageColors(lead.status);
-  // v0.10.1 — drawer header rebuilt per Leo's locked spec. 5 rows:
-  //   1. Name + status badge
-  //   2. Campaign name (megaphone icon + text) — replaces old meta line
-  //      (budget/zone/timeline moved to Infos tab as editable cards)
-  //   3. Source icon · type chip · score chip (glance data)
-  //   4. Phone number + verified/non-verified badge (click-to-call)
-  //   5. Email (click-to-copy; feedback mechanism deferred)
   const campaign = lead.campaign && lead.campaign !== "—" ? lead.campaign : "";
+
+  // ── Tab bodies ───────────────────────────────────────────────────────
+  // Infos: lead detail + qualification chips. Name/phone/email already live
+  // in the header (locked), so the Infos tab carries the qualifying detail
+  // (Budget · Secteur · Timing · Projet · Caractéristiques) rather than
+  // duplicating contact rows — all of Greg's Bloc 1 info is present in the
+  // drawer, just split between header (identity) and this tab (detail).
+  const features = (lead.features && lead.features.length)
+    ? lead.features.join(", ") : "—";
+  const infosBody = `
+    <div class="drawer-section">
+      ${drawerInfoRow("Budget", `<span class="budget-tag">${lead.budget}</span>`)}
+      ${drawerInfoRow("Secteur", lead.secteur)}
+      ${drawerInfoRow("Timing", lead.timeline)}
+      ${drawerInfoRow("Projet", lead.projectType)}
+      ${drawerInfoRow("Souhaite être contacté", lead.contactPreference)}
+      ${drawerInfoRow("Caractéristiques recherchées", features)}
+    </div>
+    <div class="drawer-section">
+      <div class="drawer-section-label">Qualification rapide</div>
+      ${renderQualChips(lead)}
+    </div>`;
+
+  // Messages rapides: 4 actions. Templates merged at render time and handed
+  // off to the device app (no in-drawer editor — V1_SCOPE §2.3).
+  const waText  = encodeURIComponent(mergeTemplate(MSG_WHATSAPP, lead));
+  const mailSub = encodeURIComponent(mergeTemplate(MSG_EMAIL_SUBJECT, lead));
+  const mailBody = encodeURIComponent(mergeTemplate(MSG_EMAIL_BODY, lead));
+  const copyMsg = encodeURIComponent(mergeTemplate(MSG_WHATSAPP, lead));
+  const messagesBody = `
+    <div class="msg-actions">
+      <a class="msg-btn" href="tel:${lead.phone.replace(/\s/g, "")}">
+        ${icon.phone()}<span>Appeler</span>
+      </a>
+      <a class="msg-btn msg-btn--wa" href="https://wa.me/${waDigits(lead.phone)}?text=${waText}" target="_blank" rel="noopener">
+        ${icon.messageCircle()}<span>WhatsApp</span>
+      </a>
+      <a class="msg-btn" href="mailto:${lead.email}?subject=${mailSub}&body=${mailBody}">
+        ${icon.mail()}<span>Email</span>
+      </a>
+      <button class="msg-btn" data-action="copy-message" data-message="${copyMsg}">
+        ${icon.copy()}<span>Copier message</span>
+      </button>
+    </div>
+    <p class="msg-hint">Le message par défaut s'ouvre dans l'application — modifiable avant l'envoi.</p>`;
+
+  // Notes: single plain textarea bound to lead.notes. Saved silently on input
+  // (no re-render — full-innerHTML render would drop focus mid-typing).
+  const notesBody = `
+    <textarea class="notes-field"
+              data-notes-lead-id="${lead.id}"
+              placeholder="Ex : cherche terrasse · rappeler mardi · veut visiter rapidement">${lead.notes || ""}</textarea>`;
+
+  const bodyByTab = { infos: infosBody, messages: messagesBody, notes: notesBody };
+
   return `
-    <aside class="drawer" data-open="true" role="dialog" aria-label="Détails du prospect">
+    <aside class="drawer" data-open="true" role="dialog" aria-label="Centre d'action">
       <div class="drawer-header">
         <div class="drawer-header-text">
           <div class="drawer-name">
@@ -3922,15 +4196,7 @@ function renderDrawer() {
         `).join("")}
       </div>
       <div class="drawer-body" role="tabpanel">
-        <div class="drawer-placeholder">
-          <strong>Onglet « ${tabs.find(t => t.id === activeTab).label} »</strong>
-          Contenu à venir — onglet construit à l'étape 3. Pour l'instant la structure, les transitions et les boundaries du tiroir sont opérationnelles.
-        </div>
-      </div>
-      <div class="drawer-footer">
-        ${renderButton({ icon: icon.phone(),         label: "Appeler" })}
-        ${renderButton({ icon: icon.messageCircle(), label: "WhatsApp" })}
-        ${renderButton({ icon: icon.send(),          label: "Template", variant: "primary" })}
+        ${bodyByTab[activeTab]}
       </div>
     </aside>
   `;
@@ -4127,6 +4393,30 @@ document.addEventListener("click", (e) => {
       }
       break;
     }
+    case "set-score": {
+      // v0.11.2 — drawer qualification chips. Set the score directly to the
+      // tapped value (vs the table's cycle). Same lead.score field, so table
+      // badge + drawer chips stay in sync. Auto-save, no modal.
+      const id = Number(target.getAttribute("data-lead-id"));
+      const score = target.getAttribute("data-score");
+      const lead = state.leads.find(l => l.id === id);
+      if (lead && SCORE_CYCLE.includes(score)) {
+        lead.score = score;
+        setState({});
+      }
+      break;
+    }
+    case "copy-message": {
+      // v0.11.2 — Messages rapides "Copier message". Text is stored
+      // URI-encoded in the attribute (newlines/quotes safe); decode + copy.
+      // Silent success for now (toast feedback deferred, same as copy-email).
+      e.preventDefault();
+      const raw = target.getAttribute("data-message");
+      if (raw && navigator.clipboard) {
+        navigator.clipboard.writeText(decodeURIComponent(raw)).catch(() => {});
+      }
+      break;
+    }
     case "seller-soon":
       // V1: Vendeurs half is disabled. Inert by design — no state change.
       break;
@@ -4201,6 +4491,18 @@ document.addEventListener("click", (e) => {
    would lose focus and cursor position mid-typing. We capture both before
    setState and restore them after it synchronously rebuilds the DOM. */
 document.addEventListener("input", (e) => {
+  // v0.11.2 — Notes tab. Save on each keystroke by mutating lead.notes
+  // directly, WITHOUT setState/re-render — the app re-renders the whole
+  // innerHTML on setState, which would drop the textarea focus mid-typing.
+  // The mobile note-present icon refreshes on the next natural render.
+  const notesEl = e.target.closest("[data-notes-lead-id]");
+  if (notesEl) {
+    const id = Number(notesEl.getAttribute("data-notes-lead-id"));
+    const lead = state.leads.find(l => l.id === id);
+    if (lead) lead.notes = notesEl.value;
+    return;
+  }
+
   const target = e.target.closest("[data-action='filter-search']");
   if (!target) return;
   const value     = target.value;
