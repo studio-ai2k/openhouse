@@ -1,5 +1,17 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.13.2
+  Drawer "Réponses Meta" tab folded back into Infos; back to 3 tabs (Infos ·
+  Messages rapides · Notes). Infos top-to-bottom: the verbatim six-Q&A Meta
+  form record (stacked, question above answer) → Qualification rapide, which
+  now holds two editable sub-blocks — Statut (the inline dropdown, opening
+  upward here) and Score (the Chaud/Tiède/Froid chips). The old Budget·Secteur·
+  Timing decision-facts strip is dropped (those values live in the Q&A; it was
+  the duplication ADR-0004 flagged). Statut open-state is now keyed by
+  { id, surface } so the drawer dropdown and the table-row dropdown for the
+  same lead don't open together. drawerInfoRow now dormant. See CHANGELOG
+  v0.13.2 + ADR-0006 (supersedes ADR-0004).
+
   Open House Leads — v0.13.1
   Front-end polish, no behaviour change. (1) H1 prefix "Prospects ·" →
   "Leads ·" — aligns the page title with the nav, routeTitles, and the
@@ -1377,6 +1389,15 @@
 
   /* Qualification chips — coloured, selectable; reuse score-chip palette */
   .qual-chips { display: flex; gap: 8px; }
+  /* v0.13.2 — Qualification rapide now holds two labelled sub-blocks
+     (Statut dropdown + Score chips) stacked vertically. */
+  .qual-row + .qual-row { margin-top: 14px; }
+  .qual-sublabel {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 7px;
+  }
   .qual-chip {
     flex: 1;
     display: inline-flex;
@@ -1715,6 +1736,10 @@
     border-radius: var(--r-md);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
   }
+  /* v0.13.2 — opens upward; used inside the drawer Qualification rapide
+     section, which sits at the bottom of the scrollable drawer body where a
+     downward menu would clip. */
+  .status-menu--up { top: auto; bottom: calc(100% + 4px); }
   .status-menu-item {
     display: flex;
     align-items: center;
@@ -2707,7 +2732,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.13.1";
+const APP_VERSION = "v0.13.2";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -2782,8 +2807,8 @@ const state = {
   sidebarOpen: false,        // mobile only
   agencySwitcherOpen: false, // sidebar dropdown
   userMenuOpen: false,       // topbar dropdown
-  openStatusMenu: null,      // v0.13.0 — lead id whose inline Statut dropdown is open (table/card)
-  drawer: null,              // null | { leadId, tab: "infos"|"messages"|"notes" }  (v0.11.2: was infos/qualification/activite/notes)
+  openStatusMenu: null,      // v0.13.0 inline Statut dropdown open-state. v0.13.2: { id, surface } — surface "row" (table/card) or "drawer", so the same lead's row menu and drawer menu don't open together
+  drawer: null,              // null | { leadId, tab: "infos"|"messages"|"notes" }  (v0.11.2: infos/messages/notes; v0.12.0 added "meta"; v0.13.2 folded "meta" into infos — back to 3)
 
   // Leads page state — consumed by the toggle, page search, filter tabs,
   // and pipeline bar. Lives at state root (not on state.route) so filter
@@ -3877,13 +3902,19 @@ function renderScoreChip(score, leadId) {
    already lost (terminal), but isn't offered in the dropdown (re-activate by
    picking a forward stage; marking-as-lost belongs to the deferred feedback
    flow). The pill is its own [data-action] so row-click never fires under it. */
-function renderStatusCell(lead) {
+function renderStatusCell(lead, opts = {}) {
+  // opts.surface: "row" (table/card, default) | "drawer". opts.menuUp opens the
+  // menu upward (drawer, where it sits at the bottom of a scrollable body).
+  // open-state is keyed by { id, surface } so a lead's row menu and drawer menu
+  // are independent — opening one doesn't pop the other (v0.13.2).
+  const surface = opts.surface || "row";
   const c = stageColors(lead.status);
   const label = stageLabel("buyer", lead.status);
-  const isOpen = state.openStatusMenu === lead.id;
+  const open = state.openStatusMenu;
+  const isOpen = !!open && open.id === lead.id && open.surface === surface;
   const stages = (state.agency.pipeline.buyer || []);
   const menu = isOpen ? `
-    <div class="status-menu" role="listbox">
+    <div class="status-menu${opts.menuUp ? " status-menu--up" : ""}" role="listbox">
       ${stages.map(s => {
         const sc = stageColors(s.id);
         const on = s.id === lead.status;
@@ -3896,7 +3927,7 @@ function renderStatusCell(lead) {
     </div>` : "";
   return `
     <span class="status-wrap">
-      <button class="status-pill" data-action="toggle-status-menu" data-lead-id="${lead.id}"
+      <button class="status-pill" data-action="toggle-status-menu" data-lead-id="${lead.id}" data-surface="${surface}"
               style="background:${c.bg};color:${c.deep};" aria-haspopup="listbox" aria-expanded="${isOpen}"
               title="Changer le statut">
         <span class="status-dot" style="background:${c.fg};"></span>
@@ -4389,6 +4420,10 @@ function renderQualChips(lead) {
 }
 
 /* Infos tab row helper. */
+/* DORMANT in V1 (since v0.13.2): the Budget·Secteur·Timing decision-facts
+   strip that used this was dropped from the Infos tab when the Meta form
+   record merged in (ADR-0006) — those values now read from the Q&A. Kept as a
+   generic label/value row primitive for V2 (the DESIGN_SPEC drawer uses it). */
 function drawerInfoRow(label, value) {
   return `
     <div class="drawer-info-row">
@@ -4397,9 +4432,11 @@ function drawerInfoRow(label, value) {
     </div>`;
 }
 
-/* Réponses Meta tab (v0.12.0). Renders the verbatim Lead Ads form record
-   from lead.formResponses — one labelled question/answer block per field,
-   in form order. Read-only; this is reference, not an action surface. */
+/* Meta form record (v0.12.0; moved into the Infos tab at v0.13.2, ADR-0006).
+   Renders the verbatim Lead Ads form record from lead.formResponses — one
+   labelled question/answer block per field, in form order, question stacked
+   above answer (mobile-friendly). Read-only reference, not an action surface.
+   Empty-safe for leads with no form record (e.g. dormant seller leads). */
 function renderMetaResponses(lead) {
   const responses = lead.formResponses || [];
   if (!responses.length) {
@@ -4420,20 +4457,21 @@ function renderMetaResponses(lead) {
 function renderDrawer() {
   // Mounted conditionally — only renders the DOM when state.drawer is set.
   // Sliding animation handled by the data-open attribute on the container.
-  // v0.11.2 — rebuilt into the "Centre d'action". v0.12.0 — now 4 tabs:
-  // Infos / Réponses Meta / Messages rapides / Notes (no Activité). The
-  // tabbed structure departs from Greg's "no tabs" brief — Leo's call as
-  // product owner (ADR-0003); the 4th "Réponses Meta" tab is ADR-0004
-  // (Greg brief Update 26-05). Header is unchanged (locked v0.10.1 spec).
-  // Old drawer footer removed — its actions live in Messages rapides.
+  // v0.11.2 — rebuilt into the "Centre d'action". v0.13.2 — 3 tabs:
+  // Infos / Messages rapides / Notes (no Activité). The tabbed structure
+  // departs from Greg's "no tabs" brief — Leo's call as product owner
+  // (ADR-0003). v0.12.0 split the Meta form record into its own "Réponses
+  // Meta" tab (ADR-0004); v0.13.2 folds it back into Infos and drops that
+  // tab (ADR-0006), so Infos now holds the verbatim form Q&A + Qualification
+  // rapide (Statut dropdown + Score chips). Header is unchanged (locked
+  // v0.10.1 spec) — name, badges, source/type/score chips, phone + email.
   if (!state.drawer) return "";
   const lead = state.leads.find(l => l.id === state.drawer.leadId);
   if (!lead) return "";
-  const VALID_TABS = ["infos", "meta", "messages", "notes"];
+  const VALID_TABS = ["infos", "messages", "notes"];
   const activeTab = VALID_TABS.includes(state.drawer.tab) ? state.drawer.tab : "infos";
   const tabs = [
     { id: "infos",    label: "Infos" },
-    { id: "meta",     label: "Réponses Meta" },
     { id: "messages", label: "Messages rapides" },
     { id: "notes",    label: "Notes" },
   ];
@@ -4441,28 +4479,27 @@ function renderDrawer() {
   const campaign = lead.campaign && lead.campaign !== "—" ? lead.campaign : "";
 
   // ── Tab bodies ───────────────────────────────────────────────────────
-  // Infos = the "decide fast" surface: the three deciding facts (Budget ·
-  // Secteur · Timing) + qualification chips. The full verbatim form record
-  // (Projet · Caractéristiques · Souhaite être contacté · etc.) lives in the
-  // Réponses Meta tab as of v0.12.0 — Infos no longer carries it, to keep
-  // this tab a glanceable action surface (name/phone/email are in the header).
+  // Infos (v0.13.2) = the full lead in one surface: the verbatim Meta form
+  // record (six stacked Q&A) on top, then Qualification rapide at the bottom
+  // holding the two editable fields — Statut (inline dropdown, opens upward
+  // here) and Score (the Chaud/Tiède/Froid chips). The old Budget·Secteur·
+  // Timing decision-facts strip is dropped: those three values now live in
+  // the Q&A answers (that strip was the duplication ADR-0004 flagged; ADR-0006
+  // removes it). Name/phone/email + badges stay in the header.
   const infosBody = `
-    <div class="drawer-section">
-      ${drawerInfoRow("Budget", `<span class="budget-tag">${lead.budget}</span>`)}
-      ${drawerInfoRow("Secteur", lead.secteur)}
-      ${drawerInfoRow("Timing", lead.timeline)}
-    </div>
+    ${renderMetaResponses(lead)}
     <div class="drawer-section">
       <div class="drawer-section-label">Qualification rapide</div>
-      ${renderQualChips(lead)}
+      <div class="qual-row">
+        <div class="qual-sublabel">Statut</div>
+        ${renderStatusCell(lead, { surface: "drawer", menuUp: true })}
+      </div>
+      <div class="qual-row">
+        <div class="qual-sublabel">Score</div>
+        ${renderQualChips(lead)}
+      </div>
     </div>
     ${isMobile() ? renderIconLegend() : ""}`;
-
-  // Réponses Meta (v0.12.0): the verbatim Lead Ads form record. Loops over
-  // lead.formResponses ([{question, answer}]) — read-only reference, the
-  // "historique des réponses" Greg asked for. Empty-safe for any lead whose
-  // form record isn't seeded (e.g. dormant seller leads).
-  const metaBody = renderMetaResponses(lead);
 
   // Messages rapides: 4 actions. Templates merged at render time and handed
   // off to the device app (no in-drawer editor — V1_SCOPE §2.3).
@@ -4494,7 +4531,7 @@ function renderDrawer() {
               data-notes-lead-id="${lead.id}"
               placeholder="Ex : cherche terrasse · rappeler mardi · veut visiter rapidement">${lead.notes || ""}</textarea>`;
 
-  const bodyByTab = { infos: infosBody, meta: metaBody, messages: messagesBody, notes: notesBody };
+  const bodyByTab = { infos: infosBody, messages: messagesBody, notes: notesBody };
 
   return `
     <aside class="drawer" data-open="true" role="dialog" aria-label="Centre d'action">
@@ -4763,7 +4800,10 @@ document.addEventListener("click", (e) => {
       // the same lead closes it; opening one closes any other. The pill is its
       // own [data-action] so the row's row-click never fires underneath.
       const id = Number(target.getAttribute("data-lead-id"));
-      setState({ openStatusMenu: state.openStatusMenu === id ? null : id });
+      const surface = target.getAttribute("data-surface") || "row";
+      const cur = state.openStatusMenu;
+      const same = !!cur && cur.id === id && cur.surface === surface;
+      setState({ openStatusMenu: same ? null : { id, surface } });
       break;
     }
     case "set-status": {
