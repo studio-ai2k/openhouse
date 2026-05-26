@@ -1,5 +1,40 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.13.5
+  Drawer redesign (layout/CSS only, V1_SCOPE §2.3a; no data-model change, no
+  ADR — pure restyling of the same content). Infos tab: the flat six-row Q&A
+  ribbon is regrouped into labelled sections (Le projet · Budget & délai ·
+  Contact), whitespace within a group and section dividers only between them
+  (drawer-wide divider rule); Budget & Timing now render as tags; the mobile
+  icon legend is its own bottom section. Header: tone-coloured 40px avatar left
+  of the name, even vertical rhythm, campaign demoted to the quietest last line
+  below contact (hairline above it), source/type/score harmonised into one pill
+  family. formResponses shape, ADR-0006, and the front-end lock all untouched.
+  See CHANGELOG v0.13.5.
+
+  Open House Leads — v0.13.4
+  Docs-only cycle (app unchanged except the APP_VERSION string). Records the
+  queued drawer-redesign brief: V1_SCOPE §2.3a now specs regrouping the Infos
+  tab into divider-separated sections (no per-row lines, whitespace within
+  groups), budget/timing as coloured tags, the icon legend moved to the bottom;
+  plus a header rework (tone-coloured avatar, even vertical rhythm, campaign
+  demoted below contact, chip family harmonised). Layout/CSS only when built,
+  no data-model change. HANDOFF §4/§5 point to it as the next move. See
+  CHANGELOG v0.13.4.
+
+  Open House Leads — v0.13.3
+  Drawer typography pass (CSS only). Infos tab had a flat hierarchy — the
+  section labels (.drawer-section-label) and the form questions (.meta-q) were
+  near-identical (both 11px/600 uppercase muted), so block titles didn't stand
+  out from the Q&A. Now three clear tiers: section heading = uppercase kicker,
+  heavier + darker (text-secondary); field labels (.meta-q + .qual-sublabel) =
+  sentence-case, muted, 12px (readable, subordinate, no more all-caps); answers
+  unchanged (14px text-body). Drawer header: campaign + phone + email unified
+  into one detail family — same colour (text-body) and line-height (1.45), and
+  tabular-nums dropped from the contact line so phone digits stop looking like a
+  different font. No JS / behaviour change. A project-wide token/font revision
+  is parked (PARKED, Design/UI) for a later dedicated pass. See CHANGELOG v0.13.3.
+
   Open House Leads — v0.13.2
   Drawer "Réponses Meta" tab folded back into Infos; back to 3 tabs (Infos ·
   Messages rapides · Notes). Infos top-to-bottom: the verbatim six-Q&A Meta
@@ -1134,12 +1169,18 @@
     flex: 1;
     min-width: 0;
     order: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;            /* one consistent gap down the stack (§2.3a) */
   }
+  /* v0.13.5 — tone-coloured initials avatar to the left of the name, matching
+     the list rows and mobile cards. Sits leftmost on desktop (order 0). */
+  .drawer-header > .avatar { order: 0; margin-top: 2px; }
   .drawer-name {
     font-size: 19px;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 4px;
+    margin: 0 0 2px;      /* +2px over the stack gap = a bit more air after the name */
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1163,14 +1204,21 @@
   /* Campaign name: megaphone icon + text, row 2 of the header. Muted
      tone so it reads as attribution metadata, not primary lead data.
      Treats empty/"—" campaign as "don't render" — handled in JSX. */
+  /* v0.13.5 (§2.3a) — campaign demoted to the quietest LAST line of the
+     header, below the contact info (it's attribution metadata, not primary
+     lead data). A single hairline separates "who they are + how to reach
+     them" from "where they came from". Tone dropped to muted. Rendered last
+     in the header DOM so reading order matches the visual order. */
   .drawer-campaign {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 2px;
-    font-size: 13px;
-    color: var(--text-secondary);
-    line-height: 1.5;
+    margin: 2px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.45;
     min-width: 0;
   }
   .drawer-campaign svg {
@@ -1203,24 +1251,40 @@
   .drawer-chip-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 12px;
+    gap: 6px;
+    margin: 0;
     flex-wrap: wrap;
+  }
+  /* v0.13.5 (§2.3a) — chip family harmonised. Source was a naked stroke icon
+     while Type/Score were filled pills (three visual weights). All three now
+     read as one pill family: same height, radius, padding, weight — aligned
+     with the status/verify badge sizing system. Tints still differ by meaning
+     (neutral source · blue Acquéreur · tonal Score). */
+  .drawer-chip-row .source-chip,
+  .drawer-chip-row .type-chip,
+  .drawer-chip-row .score-chip {
+    height: 22px;
+    padding: 0 9px;
+    border-radius: var(--r-pill);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    box-sizing: border-box;
   }
   .drawer-chip-row .source-chip {
     width: auto;
-    height: auto;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    padding: 0;
-    color: var(--text-muted);
+    gap: 0;
+    background: var(--surface-tint);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
   }
   .drawer-chip-row .source-chip svg {
-    width: 14px;
-    height: 14px;
-    stroke-width: 1.75;
+    width: 13px;
+    height: 13px;
+    stroke-width: 1.85;
   }
+  .drawer-chip-row .score-chip { gap: 5px; }
+  .drawer-chip-row .score-chip .score-chip-dot { width: 7px; height: 7px; }
 
   /* Type chip — buyer/seller identifier with type-accent palette,
      echoing the Leads page 4px top band color. Text-only, no icon. */
@@ -1246,7 +1310,7 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    margin-top: 12px;
+    margin: 0;
   }
   .drawer-contact-item {
     display: flex;
@@ -1255,9 +1319,8 @@
     font-size: 13px;
     color: var(--text-body);
     text-decoration: none;
-    font-variant-numeric: tabular-nums;
     min-width: 0;
-    line-height: 1.4;
+    line-height: 1.45;
   }
   .drawer-contact-item:hover { color: var(--text-primary); }
   .drawer-contact-item svg {
@@ -1356,15 +1419,23 @@
   }
 
   /* ── v0.11.2 — Centre d'action drawer body (3 tabs) ──────────────── */
-  .drawer-section { margin-bottom: 22px; }
-  .drawer-section:last-child { margin-bottom: 0; }
+  /* v0.13.5 — divider model (V1_SCOPE §2.3a): hairlines separate drawer
+     SECTIONS only, never individual rows. Each grouped block is a
+     .drawer-section; the rule below draws one section divider between
+     consecutive sections, drawer-wide. */
+  .drawer-section { margin-bottom: 0; }
+  .drawer-section + .drawer-section {
+    margin-top: 22px;
+    padding-top: 22px;
+    border-top: 1px solid var(--border-divider);
+  }
   .drawer-section-label {
     font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-weight: 700;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: var(--text-muted);
-    margin-bottom: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
   }
   .drawer-info-row {
     display: flex;
@@ -1394,8 +1465,8 @@
   .qual-row + .qual-row { margin-top: 14px; }
   .qual-sublabel {
     font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
+    font-weight: 500;
+    color: var(--text-muted);
     margin-bottom: 7px;
   }
   .qual-chip {
@@ -1422,24 +1493,39 @@
   .qual-chip--warm.qual-chip--on { background: #FAEEDA; color: #854F0B; border-color: #F5B94C; }
   .qual-chip--cold.qual-chip--on { background: #E6F1FB; color: #0C447C; border-color: #85B7EB; }
 
-  /* Réponses Meta tab (v0.12.0) — verbatim form Q&A, read-only reference */
-  .meta-qa {
-    padding: 11px 0;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  .meta-qa:last-child { border-bottom: none; }
+  /* Verbatim form Q&A, read-only reference (v0.12.0). v0.13.5 (§2.3a):
+     answers are grouped into labelled sections; within a group, rows are
+     separated by whitespace only — no per-row hairlines. .meta-group sets
+     the intra-group rhythm; .meta-qa is now a borderless stacked pair. */
+  .meta-group { display: flex; flex-direction: column; gap: 13px; }
+  .meta-qa { padding: 0; border: 0; }
   .meta-q {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 500;
     color: var(--text-muted);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
   }
   .meta-a {
     font-size: 14px;
     color: var(--text-body);
     line-height: 1.45;
+  }
+  /* Budget & Timing render as tags inside the form record (§2.3a) — colour +
+     rhythm instead of a grey text wall. .timing-tag shares the table's
+     .budget-tag family; both sit slightly larger here than in the table row. */
+  .meta-a .budget-tag,
+  .meta-a .timing-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: var(--surface-tint);
+    border: 1px solid var(--border-subtle);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.1px;
+    line-height: 1.3;
   }
   .meta-empty {
     font-size: 13px;
@@ -2698,8 +2784,12 @@
     .drawer-tab { white-space: nowrap; }
     .drawer-body { padding: 16px; }
     /* On mobile: close button stays on the LEFT (native iOS/Android back pattern)
-       and renders as a back-arrow. Reset the desktop order:2 that pushes it right. */
+       and renders as a back-arrow. Reset the desktop order:2 that pushes it right.
+       v0.13.5 — avatar sits between the back-arrow and the name. */
     .drawer-close { order: 0; }
+    .drawer-header > .avatar { order: 1; margin-top: 0; }
+    .drawer-header-text { order: 2; }
+    .drawer-header { gap: 10px; }
 
     /* On mobile, lock body scroll behind the drawer */
     body[data-drawer-open="true"] { overflow: hidden; }
@@ -2732,7 +2822,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.13.2";
+const APP_VERSION = "v0.13.5";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -4432,26 +4522,59 @@ function drawerInfoRow(label, value) {
     </div>`;
 }
 
-/* Meta form record (v0.12.0; moved into the Infos tab at v0.13.2, ADR-0006).
-   Renders the verbatim Lead Ads form record from lead.formResponses — one
-   labelled question/answer block per field, in form order, question stacked
-   above answer (mobile-friendly). Read-only reference, not an action surface.
-   Empty-safe for leads with no form record (e.g. dormant seller leads). */
+/* Meta form record (v0.12.0; moved into the Infos tab at v0.13.2, ADR-0006;
+   regrouped at v0.13.5 per V1_SCOPE §2.3a). Renders the verbatim Lead Ads
+   record from lead.formResponses — SAME data, same source of truth — but
+   clustered into labelled sections instead of one flat ribbon. Within a group
+   the rows are separated by whitespace only (no per-row hairlines); section
+   dividers (drawer-wide CSS) separate the groups. Budget and Timing render as
+   tags rather than grey text. Any answer whose question isn't in a known group
+   falls through to "Autres" so nothing is dropped if the backend adds fields.
+   Pure render relocation — no data-model change, no ADR (§2.3a). */
+const META_GROUPS = [
+  { label: "Le projet",      qs: ["Projet d'acquisition", "Secteur recherché", "Caractéristiques spécifiques"] },
+  { label: "Budget & délai", qs: ["Budget", "Timing projet"] },
+  { label: "Contact",        qs: ["Souhaite être contacté"] },
+];
+// Questions whose answer renders as a coloured tag (the table's tag family).
+const META_TAG_CLASS = { "Budget": "budget-tag", "Timing projet": "timing-tag" };
+
+function renderMetaAnswer(r) {
+  const tag = META_TAG_CLASS[r.question];
+  const val = r.answer || "—";
+  if (tag && r.answer) return `<div class="meta-a"><span class="${tag}">${val}</span></div>`;
+  return `<div class="meta-a">${val}</div>`;
+}
+
 function renderMetaResponses(lead) {
   const responses = lead.formResponses || [];
   if (!responses.length) {
-    return `<p class="meta-empty">Aucune réponse de formulaire enregistrée pour ce lead.</p>`;
+    return `<div class="drawer-section"><p class="meta-empty">Aucune réponse de formulaire enregistrée pour ce lead.</p></div>`;
   }
-  const rows = responses.map(r => `
-    <div class="meta-qa">
-      <div class="meta-q">${r.question}</div>
-      <div class="meta-a">${r.answer || "—"}</div>
-    </div>`).join("");
-  return `
-    <div class="drawer-section">
-      <div class="drawer-section-label">Réponses au formulaire Meta Ads</div>
-      ${rows}
-    </div>`;
+  const used = new Set();
+  const section = (label, items) => {
+    if (!items.length) return "";
+    const rows = items.map(r => `
+      <div class="meta-qa">
+        <div class="meta-q">${r.question}</div>
+        ${renderMetaAnswer(r)}
+      </div>`).join("");
+    return `
+      <div class="drawer-section">
+        <div class="drawer-section-label">${label}</div>
+        <div class="meta-group">${rows}</div>
+      </div>`;
+  };
+  const out = META_GROUPS.map(g => {
+    const items = g.qs
+      .map(q => responses.find(r => r.question === q))
+      .filter(Boolean);
+    items.forEach(r => used.add(r));
+    return section(g.label, items);
+  });
+  const leftovers = responses.filter(r => !used.has(r));
+  if (leftovers.length) out.push(section("Autres", leftovers));
+  return out.join("");
 }
 
 function renderDrawer() {
@@ -4463,8 +4586,11 @@ function renderDrawer() {
   // (ADR-0003). v0.12.0 split the Meta form record into its own "Réponses
   // Meta" tab (ADR-0004); v0.13.2 folds it back into Infos and drops that
   // tab (ADR-0006), so Infos now holds the verbatim form Q&A + Qualification
-  // rapide (Statut dropdown + Score chips). Header is unchanged (locked
-  // v0.10.1 spec) — name, badges, source/type/score chips, phone + email.
+  // rapide (Statut dropdown + Score chips). v0.13.5 reworks the header
+  // (V1_SCOPE §2.3a): tone-coloured 40px avatar left of the name, even
+  // vertical rhythm, campaign demoted to the quietest last line below the
+  // contact info (with a hairline above it), and the source/type/score chip
+  // family harmonised into one pill family.
   if (!state.drawer) return "";
   const lead = state.leads.find(l => l.id === state.drawer.leadId);
   if (!lead) return "";
@@ -4536,17 +4662,12 @@ function renderDrawer() {
   return `
     <aside class="drawer" data-open="true" role="dialog" aria-label="Centre d'action">
       <div class="drawer-header">
+        ${renderAvatar(lead.initials, lead.tone, 40)}
         <div class="drawer-header-text">
           <div class="drawer-name">
             ${lead.name}
             <span class="drawer-badge" style="background:${statusC.bg};color:${statusC.fg};">${stageLabel(lead.type, lead.status)}</span>
           </div>
-          ${campaign ? `
-            <div class="drawer-campaign">
-              ${icon.megaphone()}
-              <span>${campaign}</span>
-            </div>
-          ` : ""}
           <div class="drawer-chip-row">
             ${renderSourceIcon(lead.source)}
             ${renderTypeChip(lead.type)}
@@ -4567,6 +4688,12 @@ function renderDrawer() {
               <span class="drawer-contact-text">${lead.email}</span>
             </a>
           </div>
+          ${campaign ? `
+            <div class="drawer-campaign">
+              ${icon.megaphone()}
+              <span>${campaign}</span>
+            </div>
+          ` : ""}
         </div>
         <button class="icon-btn drawer-close" data-action="close-drawer" aria-label="Fermer">
           ${isMobile() ? icon.arrowLeft() : icon.close()}
