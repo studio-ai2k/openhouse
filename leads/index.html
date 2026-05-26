@@ -1,5 +1,19 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.11.4
+  Nav lean + dark-mode removal + feedback wiring.
+    - Nav bar: only "Leads" is live in V1. The five V2 pages (Tableau de bord,
+      Agents, Campagnes, Database, Paramètres, Aide) are now VISIBLE but greyed
+      + inert with a "Bientôt" pill (soon:true) — same dormant-but-visible
+      pattern as the Vendeurs toggle. They no longer route to the coming-soon
+      placeholder. Leads badge is now dynamic (live buyer count, was hardcoded 24).
+    - Removed the Dark Mode switch entirely: it themed nothing (non-functional).
+      Took its CSS (.sidebar-row, .switch), the moon icon, the darkMode state,
+      and the toggle-darkmode handler with it — no orphans left.
+    - "Envoyer un retour" CTA now opens a prefilled mailto to greg@lelabsocial.com.
+    - renderRouteComingSoon is now unreachable (defensive fallback only),
+      labelled dormant; its stale "étape 2/3" copy replaced with "Bientôt disponible".
+
   Open House Leads — v0.11.3
   Audit absorption (housekeeping). No behaviour change vs v0.11.2.
     - Removed dead CSS stranded by the v0.11.2 drawer rebuild: .drawer-placeholder,
@@ -480,42 +494,24 @@
   /* Sidebar footer */
   .sidebar-spacer { flex: 1; }
 
-  .sidebar-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 10px;
-    height: 40px;
-    color: var(--text-secondary);
-    font-size: 14px;
+  /* v0.11.4 — inert "soon" nav items (V2 pages). Greyed, no pointer, with a
+     "Bientôt" pill. Same dormant-but-visible language as the Vendeurs toggle. */
+  .nav-item--soon {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
-  .sidebar-row svg { width: 16px; height: 16px; stroke-width: 1.5; }
-  .sidebar-row-label { flex: 1; }
-
-  /* Toggle switch */
-  .switch {
-    position: relative;
-    width: 32px;
-    height: 18px;
+  .nav-item--soon:hover { background: transparent; }
+  .nav-item-soon {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: var(--hover-warm);
     border-radius: var(--r-pill);
-    background: var(--border-divider);
-    cursor: pointer;
-    transition: background 140ms ease;
+    padding: 2px 7px;
   }
-  .switch::after {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: #fff;
-    box-shadow: var(--shadow-xs);
-    transition: transform 160ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  }
-  .switch[data-on="true"] { background: var(--text-primary); }
-  .switch[data-on="true"]::after { transform: translateX(14px); }
 
   /* Help / info card at bottom */
   .sidebar-card {
@@ -2611,7 +2607,6 @@ const state = {
   route: "leads",  // "leads" | "dashboard" | "agents" | "campaigns" | "database" | "settings" | "help"
 
   // chrome state
-  darkMode: false,
   sidebarOpen: false,        // mobile only
   agencySwitcherOpen: false, // sidebar dropdown
   userMenuOpen: false,       // topbar dropdown
@@ -2916,7 +2911,6 @@ const icon = {
   bell:        () => svg(`<path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/>`),
   plus:        () => svg(`<path d="M12 5v14M5 12h14"/>`),
   menu:        () => svg(`<path d="M3 6h18M3 12h18M3 18h18"/>`),
-  moon:        () => svg(`<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>`),
   help:        () => svg(`<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 015.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>`),
   mapPin:      () => svg(`<path d="M20 10c0 7-8 13-8 13s-8-6-8-13a8 8 0 0116 0z"/><circle cx="12" cy="10" r="3"/>`),
   check:       () => svg(`<path d="M20 6L9 17l-5-5"/>`),
@@ -2986,18 +2980,22 @@ const navGroups = [
   {
     label: "MAIN",
     items: [
-      { id: "leads",     label: "Leads",          icon: "home",      badge: "24" },
-      { id: "dashboard", label: "Tableau de bord", icon: "barChart" },
-      { id: "agents",    label: "Agents",         icon: "users" },
-      { id: "campaigns", label: "Campagnes",      icon: "megaphone" },
-      { id: "database",  label: "Database",       icon: "archive" },
+      // v0.11.4: only "leads" is live in V1. The rest stay VISIBLE as roadmap
+      // signal but greyed + inert with a "Bientôt" tag (soon:true) — same
+      // pattern as the Vendeurs toggle (V1_SCOPE §2.4). They no longer route
+      // to the coming-soon placeholder. Leads badge is dynamic (buyerLeadCount).
+      { id: "leads",     label: "Leads",          icon: "home" },
+      { id: "dashboard", label: "Tableau de bord", icon: "barChart",  soon: true },
+      { id: "agents",    label: "Agents",         icon: "users",     soon: true },
+      { id: "campaigns", label: "Campagnes",      icon: "megaphone", soon: true },
+      { id: "database",  label: "Database",       icon: "archive",   soon: true },
     ],
   },
   {
     label: "PARAMÈTRES",
     items: [
-      { id: "settings", label: "Paramètres", icon: "settings" },
-      { id: "help",     label: "Aide",       icon: "help" },
+      { id: "settings", label: "Paramètres", icon: "settings", soon: true },
+      { id: "help",     label: "Aide",       icon: "help",     soon: true },
     ],
   },
 ];
@@ -3078,10 +3076,28 @@ function renderAgencyMenu(agency) {
   `;
 }
 
+function buyerLeadCount() {
+  // V1 shows buyer leads only; badge reflects the live count (was hardcoded 24).
+  return state.leads.filter(l => l.type === "buyer").length;
+}
+
 function renderNavItem(item, active) {
-  const badge = item.badge
-    ? `<span class="nav-item-badge">${item.badge}</span>`
-    : "";
+  // v0.11.4 — soon items (V2 pages) are inert: no data-route, not focusable,
+  // greyed, with a "Bientôt" tag. Live items keep normal button behaviour.
+  if (item.soon) {
+    return `
+      <li>
+        <div class="nav-item nav-item--soon" aria-disabled="true" title="Bientôt disponible">
+          ${icon[item.icon]()}
+          <span class="nav-item-label">${item.label}</span>
+          <span class="nav-item-soon">Bientôt</span>
+        </div>
+      </li>
+    `;
+  }
+  const badge = item.id === "leads"
+    ? `<span class="nav-item-badge">${buyerLeadCount()}</span>`
+    : (item.badge ? `<span class="nav-item-badge">${item.badge}</span>` : "");
   return `
     <li>
       <div class="nav-item" data-active="${active}" data-route="${item.id}" role="button" tabindex="0">
@@ -3104,22 +3120,15 @@ function renderNavGroup(group, activeRoute) {
   `;
 }
 
-function renderDarkModeRow(on) {
-  return `
-    <div class="sidebar-row">
-      ${icon.moon()}
-      <span class="sidebar-row-label">Dark Mode</span>
-      <div class="switch" data-on="${on}" data-action="toggle-darkmode" role="switch" aria-checked="${on}"></div>
-    </div>
-  `;
-}
-
 function renderSidebarCard() {
+  // v0.11.4 — "Envoyer un retour" now opens a prefilled email to Greg.
+  const subject = encodeURIComponent("Retour — Open House Leads");
+  const body = encodeURIComponent("Bonjour Greg,\n\n(Bug, idée ou frustration à partager :)\n\n");
   return `
     <div class="sidebar-card">
       <div class="sidebar-card-title">Un retour à partager&nbsp;?</div>
       <div class="sidebar-card-body">Bug, idée, frustration — on écoute tout.</div>
-      <a href="#" class="sidebar-card-cta">Envoyer un retour</a>
+      <a href="mailto:greg@lelabsocial.com?subject=${subject}&body=${body}" class="sidebar-card-cta">Envoyer un retour</a>
     </div>
   `;
 }
@@ -3131,7 +3140,6 @@ function renderSidebar() {
       ${renderAgencySwitcher(state.agency)}
       ${navGroups.map(g => renderNavGroup(g, state.route)).join("")}
       <div class="sidebar-spacer"></div>
-      ${renderDarkModeRow(state.darkMode)}
       ${renderSidebarCard()}
     </aside>
   `;
@@ -3982,6 +3990,10 @@ function renderRouteContent() {
   return renderRouteComingSoon();
 }
 
+// DORMANT in V1 (v0.11.4): no nav item routes here anymore — the V2 pages are
+// inert "Bientôt" items. Kept as a defensive fallback if state.route is ever
+// set to a non-leads route (e.g. direct manipulation). Copy de-staled (no
+// longer references the old étape 2/3 build sequence).
 function renderRouteComingSoon() {
   const labels = {
     dashboard: "Tableau de bord",
@@ -3996,9 +4008,9 @@ function renderRouteComingSoon() {
     <div class="empty-state">
       <div class="empty-state-left">
         <div class="empty-state-title">${title}</div>
-        <div class="empty-state-body">Page à construire. Cette section sera implémentée après l'étape 2 (Leads) et l'étape 3 (tiroir).</div>
+        <div class="empty-state-body">Bientôt disponible.</div>
       </div>
-      <div class="empty-state-chip">v0.11.3</div>
+      <div class="empty-state-chip">v0.11.4</div>
     </div>
   `;
 }
@@ -4264,9 +4276,6 @@ document.addEventListener("click", (e) => {
   // Actions
   const action = target.getAttribute("data-action");
   switch (action) {
-    case "toggle-darkmode":
-      setState({ darkMode: !state.darkMode });
-      break;
     case "open-sidebar":
       setState({ sidebarOpen: true });
       break;
