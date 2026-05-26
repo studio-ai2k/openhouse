@@ -1,5 +1,39 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.12.0
+  Feature cycle (first app-code change since v0.11.5). Drawer gains a 4th tab
+  "Réponses Meta" — the verbatim Meta Lead Ads form record (all six Q&A), so
+  agents read a lead's full profile without reopening Meta (Greg brief Update
+  26-05). Each buyer lead now carries an API-shaped `formResponses` array
+  ([{question, answer}]); the tab loops over it, so the V1 backend repository
+  layer (ADR-0001) maps Meta `field_data` → this shape with no render change.
+  Infos tab slimmed to the deciding facts (Budget · Secteur · Timing) + qual
+  chips; Projet / Caractéristiques / Souhaite être contacté move to the Meta
+  tab. Table column "Secteur" → "Secteur recherché". 4-tab drawer overrides
+  ADR-0003's tab-count → ADR-0004. See CHANGELOG v0.12.0.
+
+  Open House Leads — v0.11.8
+  Docs-only cycle (app unchanged except the APP_VERSION string). Adds
+  HANDOFF_PROMPT.md to the zip root — the durable per-session kickoff +
+  documentation guardrails (read order, version lockstep, CHANGELOG/ADR/
+  HANDOFF/STATUS rules, pre-ship checklist). README reading order + tree
+  updated. See CHANGELOG v0.11.8.
+
+  Open House Leads — v0.11.7
+  Docs-only cycle (app unchanged except the APP_VERSION string). Adopts the
+  v1.5 four-file documentation architecture and makes the master zip
+  self-contained: adds STATUS.md, docs/decisions/ index + ADR-0002 (V1 pivot)
+  + ADR-0003 (3-tab drawer), freezes pre-v1.5 decisions and audit notes in
+  appendix/, and rewrites HANDOFF (638→~132 lines) to the six-section
+  forward-only form. See CHANGELOG v0.11.7 + appendix/V0.11_AUDIT_NOTES.md.
+
+  Open House Leads — v0.11.6
+  Docs-only cycle (app unchanged except the APP_VERSION string). Records the
+  V1 backend architecture decision: Google Sheet + thin Express on Railway
+  (not Hetzner + Postgres) — see docs/decisions/0001-v1-backend-sheet-railway.md.
+  Also adds the canonical field-mapping table to docs/DATA_MODEL.md (ends the
+  camelCase-vs-snake_case drift) and opens docs/decisions/ (first ADR).
+
   Open House Leads — v0.11.5
   Feedback email polish + nav tweak + Greg mock user + mobile icon legend.
     - APP_VERSION const added (single source for the in-app version string;
@@ -1346,6 +1380,31 @@
   .qual-chip--warm.qual-chip--on { background: #FAEEDA; color: #854F0B; border-color: #F5B94C; }
   .qual-chip--cold.qual-chip--on { background: #E6F1FB; color: #0C447C; border-color: #85B7EB; }
 
+  /* Réponses Meta tab (v0.12.0) — verbatim form Q&A, read-only reference */
+  .meta-qa {
+    padding: 11px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .meta-qa:last-child { border-bottom: none; }
+  .meta-q {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .meta-a {
+    font-size: 14px;
+    color: var(--text-body);
+    line-height: 1.45;
+  }
+  .meta-empty {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
   /* Messages rapides — 4 action buttons + hint */
   .msg-actions {
     display: grid;
@@ -2568,7 +2627,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.11.5";
+const APP_VERSION = "v0.12.0";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -2768,6 +2827,58 @@ function setState(patch) {
   Object.assign(state, patch);
   render();
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   META FORM RESPONSES (v0.12.0) — the verbatim Lead Ads form record.
+
+   Greg brief Update 26-05: keep every answer the lead gave on the Meta
+   form and show it in the drawer so an agent never reopens Meta. The
+   drawer "Réponses Meta" tab loops over `lead.formResponses`, an array of
+   { question, answer } pairs in form order — the SAME shape the V1 backend
+   repository layer (ADR-0001) will produce by mapping Meta's webhook
+   `field_data` ([{ name, values }]) → { question, answer }. So the swap
+   from dummy → live data is a data-source change only; no render change.
+
+   The normalized fields the table indexes off (budget tag, short secteur
+   label, timeline, score) are derived copies and stay as-is; here we
+   reconstruct the RAW answer wording the lead actually saw on the form
+   (full secteur with arrondissements, "1M à 2M" not the "1M–2M" tag).
+   ═══════════════════════════════════════════════════════════════ */
+
+// Short table label → full Meta answer wording (with arrondissements).
+const SECTEUR_FULL = {
+  "Rive gauche":        "Rive gauche (5e, 6e, 7e)",
+  "Rive droite centre": "Rive droite centre (1er, 2e, 3e, 4e)",
+  "Rive droite ouest":  "Rive droite ouest (8e, 16e, 17e)",
+};
+// Budget tag (table) → raw Meta form answer wording.
+const BUDGET_META = {
+  "Moins de 1M": "Moins de 1M",
+  "1M–2M":       "1M à 2M",
+  "2M–4M":       "2M à 4M",
+  "4M+":         "4M+",
+};
+
+// Build the verbatim Q&A record from a buyer lead's normalized fields, in
+// Meta form order. Mirrors what the repository layer returns from the API.
+function metaResponsesFor(lead) {
+  const feats = (lead.features && lead.features.length)
+    ? lead.features.join(", ") : "—";
+  return [
+    { question: "Projet d'acquisition",         answer: lead.projectType || "—" },
+    { question: "Secteur recherché",            answer: SECTEUR_FULL[lead.secteur] || lead.secteur || "—" },
+    { question: "Caractéristiques spécifiques", answer: feats },
+    { question: "Timing projet",                answer: lead.timeline || "—" },
+    { question: "Budget",                       answer: BUDGET_META[lead.budget] || lead.budget || "—" },
+    { question: "Souhaite être contacté",       answer: lead.contactPreference || "—" },
+  ];
+}
+
+// Seed dummy buyer leads with the API-shaped record. (Seller leads use a
+// different form; they stay dormant in V1 — leadType is locked to "buyer".)
+state.leads.forEach(l => {
+  if (l.type === "buyer") l.formResponses = metaResponsesFor(l);
+});
 
 /* ═══════════════════════════════════════════════════════════════
    LEAD DATA HELPERS — pure lookups, no DOM. Used by the drawer header
@@ -3986,7 +4097,7 @@ function renderLeadsTable(view) {
           ${checkHead}
           ${renderColumnHeader("name",    "Nom",     "leads-col--nom")}
           ${renderColumnHeader("budget",  "Budget",  "leads-col--budget")}
-          ${renderColumnHeader("secteur", "Secteur", "leads-col--secteur")}
+          ${renderColumnHeader("secteur", "Secteur recherché", "leads-col--secteur")}
           ${renderColumnHeader("timing",  "Timing",  "leads-col--timing")}
           ${renderColumnHeader("score",   "Score",   "leads-col--score")}
           ${renderColumnHeader("date",    "Date",    "leads-col--date")}
@@ -4149,22 +4260,43 @@ function drawerInfoRow(label, value) {
     </div>`;
 }
 
+/* Réponses Meta tab (v0.12.0). Renders the verbatim Lead Ads form record
+   from lead.formResponses — one labelled question/answer block per field,
+   in form order. Read-only; this is reference, not an action surface. */
+function renderMetaResponses(lead) {
+  const responses = lead.formResponses || [];
+  if (!responses.length) {
+    return `<p class="meta-empty">Aucune réponse de formulaire enregistrée pour ce lead.</p>`;
+  }
+  const rows = responses.map(r => `
+    <div class="meta-qa">
+      <div class="meta-q">${r.question}</div>
+      <div class="meta-a">${r.answer || "—"}</div>
+    </div>`).join("");
+  return `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Réponses au formulaire Meta Ads</div>
+      ${rows}
+    </div>`;
+}
+
 function renderDrawer() {
   // Mounted conditionally — only renders the DOM when state.drawer is set.
   // Sliding animation handled by the data-open attribute on the container.
-  // v0.11.2 — rebuilt into the "Centre d'action": 3 tabs (Infos / Messages
-  // rapides / Notes), no Activité. The 3-tab structure is a deliberate
-  // departure from Greg's "no tabs" brief — Leo's call as product owner
-  // (HANDOFF decision 26, V1_SCOPE §2.3). Header is unchanged (locked
-  // v0.10.1 spec). Old drawer footer removed — its actions live in the
-  // Messages rapides tab now.
+  // v0.11.2 — rebuilt into the "Centre d'action". v0.12.0 — now 4 tabs:
+  // Infos / Réponses Meta / Messages rapides / Notes (no Activité). The
+  // tabbed structure departs from Greg's "no tabs" brief — Leo's call as
+  // product owner (ADR-0003); the 4th "Réponses Meta" tab is ADR-0004
+  // (Greg brief Update 26-05). Header is unchanged (locked v0.10.1 spec).
+  // Old drawer footer removed — its actions live in Messages rapides.
   if (!state.drawer) return "";
   const lead = state.leads.find(l => l.id === state.drawer.leadId);
   if (!lead) return "";
-  const activeTab = (state.drawer.tab === "messages" || state.drawer.tab === "notes")
-    ? state.drawer.tab : "infos";
+  const VALID_TABS = ["infos", "meta", "messages", "notes"];
+  const activeTab = VALID_TABS.includes(state.drawer.tab) ? state.drawer.tab : "infos";
   const tabs = [
     { id: "infos",    label: "Infos" },
+    { id: "meta",     label: "Réponses Meta" },
     { id: "messages", label: "Messages rapides" },
     { id: "notes",    label: "Notes" },
   ];
@@ -4172,27 +4304,28 @@ function renderDrawer() {
   const campaign = lead.campaign && lead.campaign !== "—" ? lead.campaign : "";
 
   // ── Tab bodies ───────────────────────────────────────────────────────
-  // Infos: lead detail + qualification chips. Name/phone/email already live
-  // in the header (locked), so the Infos tab carries the qualifying detail
-  // (Budget · Secteur · Timing · Projet · Caractéristiques) rather than
-  // duplicating contact rows — all of Greg's Bloc 1 info is present in the
-  // drawer, just split between header (identity) and this tab (detail).
-  const features = (lead.features && lead.features.length)
-    ? lead.features.join(", ") : "—";
+  // Infos = the "decide fast" surface: the three deciding facts (Budget ·
+  // Secteur · Timing) + qualification chips. The full verbatim form record
+  // (Projet · Caractéristiques · Souhaite être contacté · etc.) lives in the
+  // Réponses Meta tab as of v0.12.0 — Infos no longer carries it, to keep
+  // this tab a glanceable action surface (name/phone/email are in the header).
   const infosBody = `
     <div class="drawer-section">
       ${drawerInfoRow("Budget", `<span class="budget-tag">${lead.budget}</span>`)}
       ${drawerInfoRow("Secteur", lead.secteur)}
       ${drawerInfoRow("Timing", lead.timeline)}
-      ${drawerInfoRow("Projet", lead.projectType)}
-      ${drawerInfoRow("Souhaite être contacté", lead.contactPreference)}
-      ${drawerInfoRow("Caractéristiques recherchées", features)}
     </div>
     <div class="drawer-section">
       <div class="drawer-section-label">Qualification rapide</div>
       ${renderQualChips(lead)}
     </div>
     ${isMobile() ? renderIconLegend() : ""}`;
+
+  // Réponses Meta (v0.12.0): the verbatim Lead Ads form record. Loops over
+  // lead.formResponses ([{question, answer}]) — read-only reference, the
+  // "historique des réponses" Greg asked for. Empty-safe for any lead whose
+  // form record isn't seeded (e.g. dormant seller leads).
+  const metaBody = renderMetaResponses(lead);
 
   // Messages rapides: 4 actions. Templates merged at render time and handed
   // off to the device app (no in-drawer editor — V1_SCOPE §2.3).
@@ -4224,7 +4357,7 @@ function renderDrawer() {
               data-notes-lead-id="${lead.id}"
               placeholder="Ex : cherche terrasse · rappeler mardi · veut visiter rapidement">${lead.notes || ""}</textarea>`;
 
-  const bodyByTab = { infos: infosBody, messages: messagesBody, notes: notesBody };
+  const bodyByTab = { infos: infosBody, meta: metaBody, messages: messagesBody, notes: notesBody };
 
   return `
     <aside class="drawer" data-open="true" role="dialog" aria-label="Centre d'action">
