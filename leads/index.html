@@ -1,5 +1,19 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.11.5
+  Feedback email polish + nav tweak + Greg mock user + mobile icon legend.
+    - APP_VERSION const added (single source for the in-app version string;
+      drives the placeholder chip + the feedback email body).
+    - "Envoyer un retour": rewritten as a professional French email with a
+      structured template (type / description / repro steps) and the app
+      version, to greg@lelabsocial.com.
+    - Nav: "Tableau de bord" reactivated (clickable again) — it's the next
+      page to build once Leads is ready. Agents / Campagnes / Database /
+      Paramètres / Aide stay greyed "Bientôt".
+    - Mock logged-in user is now Greg <greg@lelabsocial.com> (role Manager).
+    - Drawer Infos tab: on MOBILE only, a "Légende des icônes" bloc is appended
+      last, explaining the four mobile-card attribute icons.
+
   Open House Leads — v0.11.4
   Nav lean + dark-mode removal + feedback wiring.
     - Nav bar: only "Leads" is live in V1. The five V2 pages (Tableau de bord,
@@ -1384,6 +1398,18 @@
   .notes-field:focus { outline: none; border-color: var(--border-strong); }
   .notes-field::placeholder { color: var(--text-muted); }
 
+  /* v0.11.5 — mobile icon legend (last bloc of Infos tab on mobile) */
+  .icon-legend { display: flex; flex-direction: column; gap: 10px; }
+  .icon-legend-row { display: flex; align-items: center; gap: 12px; }
+  .icon-legend-row .attr-icon svg { width: 16px; height: 16px; }
+  .icon-legend-label { font-size: 13px; color: var(--text-secondary); }
+  .icon-legend-hint {
+    margin: 12px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
   /* ═══════════════════════════════════════════════════════════════
      LEADS PAGE — v0.7.0 controls + card list
      Base rules only. Mobile-specific rules live in the @media block
@@ -2538,6 +2564,11 @@
    STATE — single source of truth. Every render reads from here.
    Every mutation goes through setState().
    ═══════════════════════════════════════════════════════════════ */
+/* Single source for the in-app version string (v0.11.5). Used by the
+   placeholder chip and the "Envoyer un retour" email body so they can't
+   drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
+   bumped separately (markup/docs, per Playbook §02 §1). */
+const APP_VERSION = "v0.11.5";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -2596,10 +2627,10 @@ const state = {
   },
   user: {
     id: 1,
-    name: "Léo Martin",
-    email: "leo@magrey.fr",
-    role: "Agent",      // "Agent" | "Manager" | "Admin"
-    initials: "LM",
+    name: "Greg",
+    email: "greg@lelabsocial.com",
+    role: "Manager",      // "Agent" | "Manager" | "Admin"
+    initials: "G",
     tone: "#5B6DFF",
   },
 
@@ -2984,8 +3015,10 @@ const navGroups = [
       // signal but greyed + inert with a "Bientôt" tag (soon:true) — same
       // pattern as the Vendeurs toggle (V1_SCOPE §2.4). They no longer route
       // to the coming-soon placeholder. Leads badge is dynamic (buyerLeadCount).
+      // v0.11.5: "dashboard" reactivated (clickable) — it's the next page to
+      // build once Leads is ready, so it routes to the placeholder again.
       { id: "leads",     label: "Leads",          icon: "home" },
-      { id: "dashboard", label: "Tableau de bord", icon: "barChart",  soon: true },
+      { id: "dashboard", label: "Tableau de bord", icon: "barChart" },
       { id: "agents",    label: "Agents",         icon: "users",     soon: true },
       { id: "campaigns", label: "Campagnes",      icon: "megaphone", soon: true },
       { id: "database",  label: "Database",       icon: "archive",   soon: true },
@@ -3121,9 +3154,19 @@ function renderNavGroup(group, activeRoute) {
 }
 
 function renderSidebarCard() {
-  // v0.11.4 — "Envoyer un retour" now opens a prefilled email to Greg.
-  const subject = encodeURIComponent("Retour — Open House Leads");
-  const body = encodeURIComponent("Bonjour Greg,\n\n(Bug, idée ou frustration à partager :)\n\n");
+  // v0.11.5 — "Envoyer un retour" opens a professional, prefilled email to
+  // Greg, in French, stating the app version (from APP_VERSION).
+  const subject = encodeURIComponent(`Retour utilisateur — Open House Leads ${APP_VERSION}`);
+  const body = encodeURIComponent(
+    "Bonjour,\n\n" +
+    "Je souhaite partager un retour concernant l'application Open House Leads.\n\n" +
+    "Type de retour (bug, suggestion, autre) :\n\n" +
+    "Description :\n\n" +
+    "Étapes pour reproduire (si applicable) :\n\n" +
+    "— — —\n" +
+    `Version de l'application : ${APP_VERSION}\n` +
+    "Envoyé depuis l'application Open House Leads\n"
+  );
   return `
     <div class="sidebar-card">
       <div class="sidebar-card-title">Un retour à partager&nbsp;?</div>
@@ -3795,6 +3838,31 @@ function renderAttributeIcons(lead) {
     .join("");
 }
 
+/* v0.11.5 — mobile-only legend explaining the card attribute icons. Shown as
+   the last bloc of the drawer Infos tab on mobile (the icons only appear on
+   the mobile card). Mirrors renderAttributeIcons — keep the two in sync. */
+function renderIconLegend() {
+  const items = [
+    { iconKey: "fileText", label: "Une note a été ajoutée" },
+    { iconKey: "check",    label: "Téléphone vérifié" },
+    { iconKey: "bell",     label: "À contacter tout de suite" },
+    { iconKey: "star",     label: "Critères de recherche spécifiques" },
+  ];
+  return `
+    <div class="drawer-section">
+      <div class="drawer-section-label">Légende des icônes</div>
+      <div class="icon-legend">
+        ${items.map(it => `
+          <div class="icon-legend-row">
+            <span class="attr-icon attr-icon--on">${icon[it.iconKey]()}</span>
+            <span class="icon-legend-label">${it.label}</span>
+          </div>
+        `).join("")}
+      </div>
+      <p class="icon-legend-hint">Une icône noire = information présente ; grisée = absente.</p>
+    </div>`;
+}
+
 /* Mobile lead card (v0.10.0) — renders when viewport ≤ 600px (CSS swaps
    which of .leads-table-body / .leads-cards-list is visible).
 
@@ -3990,10 +4058,8 @@ function renderRouteContent() {
   return renderRouteComingSoon();
 }
 
-// DORMANT in V1 (v0.11.4): no nav item routes here anymore — the V2 pages are
-// inert "Bientôt" items. Kept as a defensive fallback if state.route is ever
-// set to a non-leads route (e.g. direct manipulation). Copy de-staled (no
-// longer references the old étape 2/3 build sequence).
+// Reachable in V1 via the "Tableau de bord" nav item (the next page to build);
+// the other V2 routes are inert "Bientôt" nav items so they don't land here.
 function renderRouteComingSoon() {
   const labels = {
     dashboard: "Tableau de bord",
@@ -4010,7 +4076,7 @@ function renderRouteComingSoon() {
         <div class="empty-state-title">${title}</div>
         <div class="empty-state-body">Bientôt disponible.</div>
       </div>
-      <div class="empty-state-chip">v0.11.4</div>
+      <div class="empty-state-chip">${APP_VERSION}</div>
     </div>
   `;
 }
@@ -4125,7 +4191,8 @@ function renderDrawer() {
     <div class="drawer-section">
       <div class="drawer-section-label">Qualification rapide</div>
       ${renderQualChips(lead)}
-    </div>`;
+    </div>
+    ${isMobile() ? renderIconLegend() : ""}`;
 
   // Messages rapides: 4 actions. Templates merged at render time and handed
   // off to the device app (no in-drawer editor — V1_SCOPE §2.3).
