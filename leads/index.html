@@ -1,5 +1,27 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.13.1
+  Front-end polish, no behaviour change. (1) H1 prefix "Prospects ·" →
+  "Leads ·" — aligns the page title with the nav, routeTitles, and the
+  browser tab title, which already say "Leads"; resolves the long-standing
+  product-name/UI-copy drift. (2) Mobile lead-card summary row now shows
+  secteur ("Rive droite ouest") instead of zone ("Paris 16e"), matching the
+  de-zoned table. (3) renderLeadCard docstring corrected to describe the
+  current attribute-icon + Statut layout (the activity-badge stack it still
+  described was retired at v0.11.2). See CHANGELOG v0.13.1.
+
+  Open House Leads — v0.13.0
+  Feature cycle. Adopts Greg's simplified status taxonomy (docx brief 26-05)
+  and brings back a Statut column. Buyer pipeline is now four forward stages —
+  Nouveau · À contacter · Contacté · Visite prévue (Perdu kept as the terminal
+  off-funnel state). New sortable Statut column sits between Timing and Score,
+  editable inline via an instant dropdown (click → pick → auto-save, no modal).
+  Score stays click-to-cycle (3 values — one tap beats a dropdown; see ADR-0005
+  / flagged for Greg). Filter cards + pipeline counts adapt automatically to the
+  new stages. The "Tableau de bord" page from the same brief is absorbed into
+  docs as in-scope-but-deferred (V1_SCOPE §6 + PARKED) — no dashboard code this
+  cycle, pending a brainstorming pass. See CHANGELOG v0.13.0 + ADR-0005.
+
   Open House Leads — v0.12.0
   Feature cycle (first app-code change since v0.11.5). Drawer gains a 4th tab
   "Réponses Meta" — the verbatim Meta Lead Ads form record (all six Q&A), so
@@ -108,8 +130,7 @@
   §11, PARKED.md. Source brief: openhouse_V1_brief.pdf (zip root).
 
   --- still to come in the V1 line ---
-    polish : H1 prefix still reads "Prospects ·" — French wording decision
-             (Prospects vs Leads) left for Leo; nav already says "Leads".
+    polish : H1 prefix resolved at v0.13.1 ("Prospects ·" → "Leads ·").
              Default sort date-desc still pending.
 
   === prior cycle: v0.10.6 — Report content refresh (master-zip lockstep) ===
@@ -1657,6 +1678,63 @@
   .score-chip--cold { background: #E6F1FB; color: #0C447C; }
   .score-chip--cold .score-chip-dot { background: #85B7EB; }
 
+  /* Statut inline control (v0.13.0) — coloured pill + instant dropdown.
+     Pill colours are set inline from stageColors(); these are structure only. */
+  .status-wrap { position: relative; display: inline-flex; }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px 3px 9px;
+    border: 0;
+    border-radius: var(--r-pill);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.1px;
+    line-height: 1.3;
+    cursor: pointer;
+    max-width: 100%;
+  }
+  .status-pill .status-pill-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .status-pill svg { width: 13px; height: 13px; opacity: 0.65; flex-shrink: 0; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .status-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 40;
+    min-width: 168px;
+    padding: 5px;
+    background: var(--panel);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--r-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  }
+  .status-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 9px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-body);
+    text-align: left;
+    cursor: pointer;
+  }
+  .status-menu-item:hover { background: var(--surface-tint); }
+  .status-menu-item--on { font-weight: 600; }
+  .status-menu-item .status-check { margin-left: auto; display: inline-flex; }
+  .status-menu-item .status-check svg { width: 15px; height: 15px; color: var(--accent-blue); }
+
   /* Leads table card — contained Prodex-style card. Whole table (header +
      column labels + rows) lives inside one surface. Click a row → drawer.
      Design notes:
@@ -1763,6 +1841,7 @@
       minmax(92px,  0.9fr)  /* Budget (tag)                   */
       minmax(130px, 1.2fr)  /* Secteur                        */
       minmax(150px, 1.3fr)  /* Timing                         */
+      minmax(124px, 1.15fr) /* Statut (inline dropdown)       */
       minmax(86px,  0.85fr) /* Score chip                     */
       minmax(86px,  0.9fr); /* Date                           */
     gap: 14px;
@@ -1778,6 +1857,7 @@
       minmax(92px,  0.9fr)
       minmax(130px, 1.2fr)
       minmax(150px, 1.3fr)
+      minmax(124px, 1.15fr) /* Statut                         */
       minmax(86px,  0.85fr)
       minmax(86px,  0.9fr);
   }
@@ -2308,7 +2388,7 @@
      reading from them. Only the page-top chrome changes. */
 
   /* Page title. Active mode is accented (picks up --type-accent)
-     and sits inline with a muted "Prospects ·" prefix. */
+     and sits inline with a muted "Leads ·" prefix. */
   .leads .leads-title {
     display: flex;
     align-items: baseline;
@@ -2627,7 +2707,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.12.0";
+const APP_VERSION = "v0.13.1";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -2665,14 +2745,16 @@ const state = {
     // Stage `id` is stable (what gets stored on a lead); `label` can be renamed
     // by the agency without breaking data. leads with status "lost" sit outside
     // the pipeline — terminal state, rendered as the "Perdu" tab.
+    // v0.13.0: buyer pipeline simplified to Greg's 4 forward stages (docx brief
+    // 26-05). The old 6-stage funnel (qualified/offer_made/converted) folded in;
+    // "lost"/Perdu stays the off-funnel terminal state. Seller pipeline untouched
+    // (dormant in V1). Stage ids feed the Statut column, filter cards, and counts.
     pipeline: {
       buyer: [
-        { id: "to_process",    label: "À traiter" },
-        { id: "contacted",     label: "Contacté" },
-        { id: "qualified",     label: "Qualifié" },
-        { id: "visit_planned", label: "Visite programmée" },
-        { id: "offer_made",    label: "Offre faite" },
-        { id: "converted",     label: "Converti" },
+        { id: "nouveau",       label: "Nouveau" },
+        { id: "a_contacter",   label: "À contacter" },
+        { id: "contacte",      label: "Contacté" },
+        { id: "visite_prevue", label: "Visite prévue" },
       ],
       seller: [
         { id: "to_process",      label: "À traiter" },
@@ -2700,6 +2782,7 @@ const state = {
   sidebarOpen: false,        // mobile only
   agencySwitcherOpen: false, // sidebar dropdown
   userMenuOpen: false,       // topbar dropdown
+  openStatusMenu: null,      // v0.13.0 — lead id whose inline Statut dropdown is open (table/card)
   drawer: null,              // null | { leadId, tab: "infos"|"messages"|"notes" }  (v0.11.2: was infos/qualification/activite/notes)
 
   // Leads page state — consumed by the toggle, page search, filter tabs,
@@ -2764,31 +2847,31 @@ const state = {
   // both compare against iso.slice(0, 10), so the date-portion logic
   // is unchanged — only the display layer gained time.
   leads: [
-    { id: 1,  type: "buyer", initials: "ML", tone: "#A855F7", name: "Marie Lefèvre",       email: "marie.lefevre@gmail.com", phone: "+33 6 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "qualified",     score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(0, 7, 42),  notes: "Recherche 3 pièces avec balcon. Budget flexible.",
+    { id: 1,  type: "buyer", initials: "ML", tone: "#A855F7", name: "Marie Lefèvre",       email: "marie.lefevre@gmail.com", phone: "+33 6 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "contacte",     score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(0, 7, 42),  notes: "Recherche 3 pièces avec balcon. Budget flexible.",
       activity: [
         { type: "call",  at: "2026-04-18T10:15:00Z", by: 1 },
         { type: "email", at: "2026-04-18T10:40:00Z", by: 1 },
         { type: "note",  at: "2026-04-18T10:45:00Z", by: 1 },
       ] },
-    { id: 2,  type: "buyer", initials: "PD", tone: "#0EA5E9", name: "Pierre Durand",        email: "p.durand@outlook.fr",    phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Neuilly",   timeline: "Plus de 6 mois",           projectType: "Résidence principale", contactPreference: "Dans un mois", features: ["Autre"], status: "contacted",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Neuilly Familles",   createdAt: daysAgoISO(9, 20, 18), notes: "Premier achat. Besoin d'accompagnement financement.",
+    { id: 2,  type: "buyer", initials: "PD", tone: "#0EA5E9", name: "Pierre Durand",        email: "p.durand@outlook.fr",    phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Neuilly",   timeline: "Plus de 6 mois",           projectType: "Résidence principale", contactPreference: "Dans un mois", features: ["Autre"], status: "contacte",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Neuilly Familles",   createdAt: daysAgoISO(9, 20, 18), notes: "Premier achat. Besoin d'accompagnement financement.",
       activity: [
         { type: "call",  at: "2026-04-08T14:30:00Z", by: 2 },
       ] },
-    { id: 3,  type: "buyer", initials: "SM", tone: "#6366F1", name: "Sophie Martin",        email: "smartin@free.fr",        phone: "+33 7 12 34 56 78", phoneVerified: false, budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Immédiatement",            projectType: "Pied-à-terre", contactPreference: "Dans un mois",         features: ["Style haussmannien"], status: "to_process",     score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(0, 11, 5),  notes: "",
+    { id: 3,  type: "buyer", initials: "SM", tone: "#6366F1", name: "Sophie Martin",        email: "smartin@free.fr",        phone: "+33 7 12 34 56 78", phoneVerified: false, budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Immédiatement",            projectType: "Pied-à-terre", contactPreference: "Dans un mois",         features: ["Style haussmannien"], status: "nouveau",     score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(0, 11, 5),  notes: "",
       activity: [] },
-    { id: 4,  type: "buyer", initials: "JM", tone: "#14B8A6", name: "Jean-Baptiste Moreau", email: "jb.moreau@gmail.com",    phone: "+33 6 23 45 67 89", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Boulogne",  timeline: "Plus de 6 mois",           projectType: "Résidence principale", contactPreference: "Pas pour le moment", features: ["Autre"], status: "contacted",      score: "cold", source: "fb",     assignedAgentId: 1,    campaign: "Boulogne Actifs",    createdAt: daysAgoISO(4, 12, 47), notes: "Rappeler lundi matin. Intéressé par T2 avec parking.",
+    { id: 4,  type: "buyer", initials: "JM", tone: "#14B8A6", name: "Jean-Baptiste Moreau", email: "jb.moreau@gmail.com",    phone: "+33 6 23 45 67 89", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Boulogne",  timeline: "Plus de 6 mois",           projectType: "Résidence principale", contactPreference: "Pas pour le moment", features: ["Autre"], status: "contacte",      score: "cold", source: "fb",     assignedAgentId: 1,    campaign: "Boulogne Actifs",    createdAt: daysAgoISO(4, 12, 47), notes: "Rappeler lundi matin. Intéressé par T2 avec parking.",
       activity: [
         { type: "call", at: "2026-04-07T09:20:00Z", by: 1 },
       ] },
-    { id: 5,  type: "buyer", initials: "CR", tone: "#F97316", name: "Camille Rousseau",     email: "camille.r@icloud.com",   phone: "+33 7 34 56 78 90", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 8e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre", contactPreference: "Dans un mois",        features: ["Vue dégagée"], status: "to_process",     score: "warm", source: "ig",     assignedAgentId: null, campaign: "Prestige Madeleine", createdAt: daysAgoISO(0, 15, 22), notes: "Investissement locatif. Cherche rentabilité > 4%.",
+    { id: 5,  type: "buyer", initials: "CR", tone: "#F97316", name: "Camille Rousseau",     email: "camille.r@icloud.com",   phone: "+33 7 34 56 78 90", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 8e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre", contactPreference: "Dans un mois",        features: ["Vue dégagée"], status: "a_contacter",     score: "warm", source: "ig",     assignedAgentId: null, campaign: "Prestige Madeleine", createdAt: daysAgoISO(0, 15, 22), notes: "Investissement locatif. Cherche rentabilité > 4%.",
       activity: [] },
-    { id: 6,  type: "buyer", initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "visit_planned",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e", createdAt: daysAgoISO(3, 21, 8),  notes: "Visite prévue mercredi 14h.",
+    { id: 6,  type: "buyer", initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "visite_prevue",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e", createdAt: daysAgoISO(3, 21, 8),  notes: "Visite prévue mercredi 14h.",
       activity: [
         { type: "call",  at: "2026-04-05T11:00:00Z", by: 3 },
         { type: "email", at: "2026-04-06T16:20:00Z", by: 3 },
         { type: "note",  at: "2026-04-07T09:00:00Z", by: 3 },
       ] },
-    { id: 7,  type: "buyer", initials: "IC", tone: "#8B5CF6", name: "Isabelle Chen",        email: "ichen@proton.me",        phone: "+33 7 56 78 90 12", phoneVerified: true,  budget: "2M–4M",      secteur: "Rive gauche",        zone: "Paris 6e",  timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Architecture contemporaine signée"], status: "qualified",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(1, 9, 30),  notes: "Expatriée, retour en France. Budget confortable.",
+    { id: 7,  type: "buyer", initials: "IC", tone: "#8B5CF6", name: "Isabelle Chen",        email: "ichen@proton.me",        phone: "+33 7 56 78 90 12", phoneVerified: true,  budget: "2M–4M",      secteur: "Rive gauche",        zone: "Paris 6e",  timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Architecture contemporaine signée"], status: "contacte",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(1, 9, 30),  notes: "Expatriée, retour en France. Budget confortable.",
       activity: [
         { type: "call", at: "2026-04-06T15:30:00Z", by: 1 },
         { type: "note", at: "2026-04-06T16:00:00Z", by: 1 },
@@ -2798,11 +2881,11 @@ const state = {
         { type: "call", at: "2026-04-04T10:00:00Z", by: 2 },
         { type: "note", at: "2026-04-04T10:10:00Z", by: 2 },
       ] },
-    { id: 9,  type: "buyer", initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Dans un mois", features: ["Autre"], status: "contacted",      score: "warm", source: "email",  assignedAgentId: null, campaign: "—",                  createdAt: daysAgoISO(6, 19, 15), notes: "Formulaire site web. Rappeler en soirée.",
+    { id: 9,  type: "buyer", initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Dans un mois", features: ["Autre"], status: "a_contacter",      score: "warm", source: "email",  assignedAgentId: null, campaign: "—",                  createdAt: daysAgoISO(6, 19, 15), notes: "Formulaire site web. Rappeler en soirée.",
       activity: [
         { type: "call", at: "2026-04-08T19:15:00Z", by: null },
       ] },
-    { id: 10, type: "buyer", initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "offer_made",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(5, 10, 12), notes: "Recherche hôtel particulier. Offre transmise mardi.",
+    { id: 10, type: "buyer", initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "visite_prevue",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(5, 10, 12), notes: "Recherche hôtel particulier. Offre transmise mardi.",
       activity: [
         { type: "call",     at: "2026-04-07T09:30:00Z", by: 3 },
         { type: "email",    at: "2026-04-08T11:00:00Z", by: 3 },
@@ -2912,7 +2995,12 @@ function stageColors(stageId) {
   // fg   = mid-saturation color (icon stroke, active-state label/accent)
   // deep = dark variant for bold text on the tinted surface (active card's count)
   return {
-    // Buyer pipeline
+    // Buyer pipeline (v0.13.0 — Greg's 4-stage funnel)
+    nouveau:         { bg: "#E8ECFF", fg: "#5B6DFF", deep: "#2A3AB8" },  // blue — fresh
+    a_contacter:     { bg: "#FBF0DC", fg: "#8C5A08", deep: "#5A3A05" },  // amber — needs a call
+    contacte:        { bg: "#EDE7FF", fg: "#6D48DB", deep: "#3E2595" },  // violet — in motion
+    visite_prevue:   { bg: "#E4F4E9", fg: "#2F9D6F", deep: "#15653E" },  // green — progressing
+    // Legacy buyer ids (dormant — kept so any un-migrated data still colours)
     to_process:      { bg: "#E8ECFF", fg: "#5B6DFF", deep: "#2A3AB8" },  // blue — fresh
     contacted:       { bg: "#EDE7FF", fg: "#6D48DB", deep: "#3E2595" },  // violet — in motion
     qualified:       { bg: "#E4F4E9", fg: "#2F9D6F", deep: "#15653E" },  // green — qualified
@@ -3016,6 +3104,10 @@ function leadPriceNumeric(lead) {
    Unknown scores sort last. */
 const SCORE_ORDER = { hot: 3, warm: 2, cold: 1 };
 function leadScoreOrder(lead) { return SCORE_ORDER[lead.score] || 0; }
+// v0.13.0 — forward order of the 4 buyer stages, + Perdu last. Drives the
+// Statut column sort. Stage ids that aren't in the funnel fall back to 0.
+const STATUS_ORDER = { nouveau: 1, a_contacter: 2, contacte: 3, visite_prevue: 4, lost: 5 };
+function leadStatusOrder(lead) { return STATUS_ORDER[lead.status] || 0; }
 
 /* Agent name lookup for sort. Unassigned leads sort as empty string (top in
    asc, bottom in desc). */
@@ -3035,6 +3127,7 @@ function leadComparator(column) {
     case "timing": return (a, b) => (TIMING_ORDER[leadTimeline(a)] || 0) - (TIMING_ORDER[leadTimeline(b)] || 0);
     case "zone":   return (a, b) => (a.zone || "").localeCompare(b.zone || "", "fr");
     case "score":  return (a, b) => leadScoreOrder(a) - leadScoreOrder(b);
+    case "statut": return (a, b) => leadStatusOrder(a) - leadStatusOrder(b);
     case "agent":  return (a, b) => leadAgentName(a).localeCompare(leadAgentName(b), "fr");
     case "date":   return (a, b) => (a.createdAt || "").localeCompare(b.createdAt || "");  // ISO string compare = chronological
     default:       return (a, b) => a.id - b.id;
@@ -3470,12 +3563,11 @@ function computeLeadsView() {
   });
 
   // Apply filter tab on top of the base set.
-  // Layer 2 note: "all" excludes lost — the Statut column is gone, so a
-  // lost lead in the default view has no visual cue distinguishing it
-  // from an active one. Lost leads become reachable again when the
-  // Filter popover ships (it'll add a "Afficher les perdus" toggle that
-  // sets filterTab to "lost"). The "lost" code path is kept alive here
-  // so the popover can use it without refactor.
+  // Layer 2 note: "all" excludes lost. As of v0.13.0 the Statut column is
+  // back, so a lost lead now carries a visible "Perdu" pill when shown.
+  // Lost leads are surfaced via the "lost" filter path (a future Filter
+  // popover "Afficher les perdus" toggle sets filterTab to "lost"); the
+  // code path is kept alive here so that ships without a refactor.
   //
   // v0.9.2 — two new cross-cutting filter values (not stage ids):
   //   "today"      → leads where createdAt === today (any stage, excludes lost)
@@ -3556,15 +3648,17 @@ function renderLeadsModeCard() {
   `;
 }
 
-/* Page title. Active mode is accented and inline with the "Prospects ·"
-   prefix. Re-reads every render so mode flips re-color the word.
+/* Page title. Active mode is accented and inline with the "Leads ·"
+   prefix (was "Prospects ·" through v0.13.0; aligned to the product
+   name / nav / tab title at v0.13.1). Re-reads every render so mode
+   flips re-color the word.
    v0.10.3 — replaces the old 4px top band as the mode-identity signal
    at the top of the page. */
 function renderLeadsTitle() {
   const modeLabel = state.leadType === "buyer" ? "Acquéreurs" : "Vendeurs";
   return `
     <h1 class="leads-title">
-      <span class="leads-title-prefix">Prospects ·</span>
+      <span class="leads-title-prefix">Leads ·</span>
       <span class="leads-title-mode">${modeLabel}</span>
     </h1>
   `;
@@ -3775,6 +3869,44 @@ function renderScoreChip(score, leadId) {
   return `<span class="score-chip score-chip--${m.mod}">${inner}</span>`;
 }
 
+/* Statut cell (v0.13.0) — the inline-editable status control for the table
+   and mobile card. Renders a coloured pill showing the current stage; click
+   opens an instant dropdown of the 4 buyer stages (Greg docx brief: "dropdown
+   instantané, auto-save, pas de popup"). Selecting sets lead.status directly
+   and re-renders — no modal, no save step. "Perdu" is shown when a lead is
+   already lost (terminal), but isn't offered in the dropdown (re-activate by
+   picking a forward stage; marking-as-lost belongs to the deferred feedback
+   flow). The pill is its own [data-action] so row-click never fires under it. */
+function renderStatusCell(lead) {
+  const c = stageColors(lead.status);
+  const label = stageLabel("buyer", lead.status);
+  const isOpen = state.openStatusMenu === lead.id;
+  const stages = (state.agency.pipeline.buyer || []);
+  const menu = isOpen ? `
+    <div class="status-menu" role="listbox">
+      ${stages.map(s => {
+        const sc = stageColors(s.id);
+        const on = s.id === lead.status;
+        return `<button class="status-menu-item${on ? " status-menu-item--on" : ""}"
+                        role="option" aria-selected="${on}"
+                        data-action="set-status" data-lead-id="${lead.id}" data-status="${s.id}">
+          <span class="status-dot" style="background:${sc.fg};"></span>${s.label}${on ? `<span class="status-check">${icon.check()}</span>` : ""}
+        </button>`;
+      }).join("")}
+    </div>` : "";
+  return `
+    <span class="status-wrap">
+      <button class="status-pill" data-action="toggle-status-menu" data-lead-id="${lead.id}"
+              style="background:${c.bg};color:${c.deep};" aria-haspopup="listbox" aria-expanded="${isOpen}"
+              title="Changer le statut">
+        <span class="status-dot" style="background:${c.fg};"></span>
+        <span class="status-pill-label">${label}</span>
+        ${icon.chevronDown()}
+      </button>
+      ${menu}
+    </span>`;
+}
+
 /* Source icon: compact branded tile. Pure CSS + initial letter — we avoid
    shipping brand SVGs both for trademark hygiene and for a consistent
    visual weight across sources at 18px. */
@@ -3866,9 +3998,10 @@ function renderColumnHeader(key, label, colClass) {
 function renderLeadRow(lead) {
   const selected     = state.drawer?.leadId === lead.id;
   const picked       = state.selectedLeadIds.includes(lead.id);
-  // V1 table: Nom · Budget · Secteur · Timing · Score · Date. Agent column
-  // removed (no assignment in V1; assignedAgentId stays in data for V2).
+  // V1 table (v0.13.0): Nom · Budget · Secteur · Timing · Statut · Score · Date.
+  // Agent column removed (no assignment in V1; assignedAgentId stays for V2).
   // Secteur and Timing are separate columns — never merged (Greg brief §3).
+  // Statut is inline-editable via renderStatusCell; Score cycles on click.
   const secteur      = lead.secteur || "—";
   const timing       = timingShort(leadTimeline(lead));
   const checkboxCell = state.selectionMode
@@ -3891,6 +4024,7 @@ function renderLeadRow(lead) {
       <div class="leads-col leads-col--budget"><span class="budget-tag">${leadPrice(lead)}</span></div>
       <div class="leads-col leads-col--secteur">${secteur}</div>
       <div class="leads-col leads-col--timing">${timing}</div>
+      <div class="leads-col leads-col--statut">${renderStatusCell(lead)}</div>
       <div class="leads-col leads-col--score">${renderScoreChip(lead.score, lead.id)}</div>
       <div class="leads-col leads-col--date">${formatLeadDateHuman(lead.createdAt)}</div>
     </div>
@@ -3981,19 +4115,20 @@ function renderIconLegend() {
    - Avatar vertically centered on the left (40px, content-colored)
    - Content block (flex column) to the right:
        Row 1: name + inline score chip
-       Row 2: budget · zone · timeline
-       Row 3: source chip + ISO date
-   - Activity badge stack on the far right (outline-only done badges,
-     24px, vertical). Only renders the distinct action types present.
-   - Left accent bar (3px) when lead has zero activity entries —
-     untouched signal, triggered via the --untouched CSS attribute.
+       Row 2: budget · secteur · timeline
+       Row 3: source chip + date + inline Statut pill
+   - Attribute-icon stack on the far right — four data-verified icons
+     (renderAttributeIcons): note present, phone verified, contact
+     "Tout de suite", specific criteria. Replaced the activity-badge
+     stack at v0.11.2 (activity[] deferred to V2). v0.13.1: Row 2
+     shows secteur, not zone, to match the de-zoned table.
 
    Same data-action contract as renderLeadRow: click = open drawer in
    default mode, toggle selection in select mode. */
 function renderLeadCard(lead) {
   const selected = state.drawer?.leadId === lead.id;
   const picked   = state.selectedLeadIds.includes(lead.id);
-  const zone     = lead.zone || "—";
+  const secteur  = lead.secteur || "—";
   const timeline = leadTimeline(lead);
   const checkbox = state.selectionMode
     ? `<span class="leads-card-checkbox ${picked ? "leads-card-checkbox--on" : ""}" aria-hidden="true">${picked ? icon.check() : ""}</span>`
@@ -4011,10 +4146,11 @@ function renderLeadCard(lead) {
           <div class="leads-card-name">${lead.name}</div>
           ${renderScoreChip(lead.score, lead.id)}
         </div>
-        <div class="leads-card-summary">${leadPrice(lead)} · ${zone}${timeline ? ` · ${timeline}` : ""}</div>
+        <div class="leads-card-summary">${leadPrice(lead)} · ${secteur}${timeline ? ` · ${timeline}` : ""}</div>
         <div class="leads-card-meta">
           ${renderSourceIcon(lead.source)}
           <span class="leads-card-date">${formatLeadDate(lead.createdAt, { showYear: false, longMonth: true, showTime: true })}</span>
+          ${renderStatusCell(lead)}
         </div>
       </div>
       <div class="leads-card-attrs">${renderAttributeIcons(lead)}</div>
@@ -4099,6 +4235,7 @@ function renderLeadsTable(view) {
           ${renderColumnHeader("budget",  "Budget",  "leads-col--budget")}
           ${renderColumnHeader("secteur", "Secteur recherché", "leads-col--secteur")}
           ${renderColumnHeader("timing",  "Timing",  "leads-col--timing")}
+          ${renderColumnHeader("statut",  "Statut",  "leads-col--statut")}
           ${renderColumnHeader("score",   "Score",   "leads-col--score")}
           ${renderColumnHeader("date",    "Date",    "leads-col--date")}
         </div>
@@ -4458,6 +4595,11 @@ document.addEventListener("click", (e) => {
     setState({ userMenuOpen: false });
   }
 
+  // v0.13.0 — outside-click closes the inline Statut dropdown
+  if (state.openStatusMenu != null && !e.target.closest(".status-wrap")) {
+    setState({ openStatusMenu: null });
+  }
+
   const target = e.target.closest("[data-action], [data-route]");
   if (!target) return;
 
@@ -4469,6 +4611,7 @@ document.addEventListener("click", (e) => {
       sidebarOpen: false,
       agencySwitcherOpen: false,
       userMenuOpen: false,
+      openStatusMenu: null,
     });
     return;
   }
@@ -4612,6 +4755,29 @@ document.addEventListener("click", (e) => {
       if (lead && SCORE_CYCLE.includes(score)) {
         lead.score = score;
         setState({});
+      }
+      break;
+    }
+    case "toggle-status-menu": {
+      // v0.13.0 — open/close the inline Statut dropdown for this lead. Toggling
+      // the same lead closes it; opening one closes any other. The pill is its
+      // own [data-action] so the row's row-click never fires underneath.
+      const id = Number(target.getAttribute("data-lead-id"));
+      setState({ openStatusMenu: state.openStatusMenu === id ? null : id });
+      break;
+    }
+    case "set-status": {
+      // v0.13.0 — pick a stage from the inline dropdown. Sets lead.status
+      // directly and closes the menu — auto-save, no modal, no save step
+      // (Greg docx brief). Table badge, drawer badge, and filter counts all
+      // read lead.status, so they stay in sync on the next render.
+      const id = Number(target.getAttribute("data-lead-id"));
+      const status = target.getAttribute("data-status");
+      const lead = state.leads.find(l => l.id === id);
+      const valid = (state.agency.pipeline.buyer || []).some(s => s.id === status);
+      if (lead && valid) {
+        lead.status = status;
+        setState({ openStatusMenu: null });
       }
       break;
     }
