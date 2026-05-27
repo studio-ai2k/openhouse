@@ -1,16 +1,18 @@
 <!doctype html>
 <!--
-  Open House Leads — v0.13.5
-  Drawer redesign (layout/CSS only, V1_SCOPE §2.3a; no data-model change, no
-  ADR — pure restyling of the same content). Infos tab: the flat six-row Q&A
-  ribbon is regrouped into labelled sections (Le projet · Budget & délai ·
-  Contact), whitespace within a group and section dividers only between them
-  (drawer-wide divider rule); Budget & Timing now render as tags; the mobile
-  icon legend is its own bottom section. Header: tone-coloured 40px avatar left
-  of the name, even vertical rhythm, campaign demoted to the quietest last line
-  below contact (hairline above it), source/type/score harmonised into one pill
-  family. formResponses shape, ADR-0006, and the front-end lock all untouched.
-  See CHANGELOG v0.13.5.
+  Open House Leads — v0.14.0
+  Drawer redesign — locked (ADR-0007; closes V1_SCOPE §2.3a). Layout/CSS plus
+  one new render control; no data-model change. Header: tone-coloured 40px
+  avatar + name on top, then a flush-left meta block — source · type · Statut ·
+  Score on the chip line (Statut AND Score now inline dropdowns, one pill+menu
+  family), then a titled Contact block (phone + Vérifié, email); no separator
+  lines. Body: the verbatim Meta record sits on a white card (panel + table
+  radius) with the campaign as the card's head strip; six Q&A in the body, one
+  coherent answer type. New renderScoreCell (Chaud/Tiède/Froid dropdown) writes
+  the same lead.score as the table's click-to-cycle; renderQualChips goes
+  DORMANT. Per-element Meta→drawer wiring is the Drawer data contract in
+  docs/DATA_MODEL.md. formResponses shape, ADR-0001 mapping, front-end lock all
+  untouched. See CHANGELOG v0.14.0 and ADR-0007.
 
   Open House Leads — v0.13.4
   Docs-only cycle (app unchanged except the APP_VERSION string). Records the
@@ -1151,103 +1153,65 @@
     transform: translateX(0);
   }
 
+  /* v0.14.0 — header is a vertical stack (V1_SCOPE §2.3a, revised on-device):
+     a top row holds the avatar + name (+ close/back), and a meta block below
+     it spans the full width, left-aligned to the header's padding edge — so
+     campaign / chips / contact are flush-left, not indented under the name.
+     No separator line inside the header. */
   .drawer-header {
-    padding: 20px 24px 40px;
+    padding: 20px 24px 22px;
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
     gap: 14px;
   }
-  /* Close button on desktop uses the same .icon-btn style as the topbar + and bell.
-     Positioned by DOM order — it comes AFTER the header-text in the flex row,
-     so it sits on the right. On mobile it's overridden to be a top-left back arrow. */
+  .drawer-header-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  /* Close button uses the same .icon-btn style as the topbar + and bell. On
+     desktop it sits at the right end of the top row (margin-left:auto); on
+     mobile it's a top-left back arrow (order reset below). */
   .drawer-close {
     flex-shrink: 0;
-    order: 2;         /* force to the right end of the flex row on desktop */
+    order: 3;
+    margin-left: auto;   /* desktop: push to the right end of the top row */
   }
-  .drawer-header-text {
-    flex: 1;
-    min-width: 0;
-    order: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;            /* one consistent gap down the stack (§2.3a) */
-  }
-  /* v0.13.5 — tone-coloured initials avatar to the left of the name, matching
-     the list rows and mobile cards. Sits leftmost on desktop (order 0). */
-  .drawer-header > .avatar { order: 0; margin-top: 2px; }
+  .drawer-header-top > .avatar { order: 1; }
   .drawer-name {
+    order: 2;
     font-size: 19px;
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0 0 2px;      /* +2px over the stack gap = a bit more air after the name */
+    margin: 0;
     display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+    min-width: 0;
   }
-  .drawer-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    background: #E4F4E9;
-    color: #2F9D6F;
-    font-size: 11px;
-    font-weight: 600;
-    border-radius: var(--r-pill);
-    flex-shrink: 0;
+  /* Meta block: campaign, chips, contact — full width, left-aligned. */
+  .drawer-header-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 11px;
+    min-width: 0;
   }
+  /* Contact group: a titled block (label + phone/email) inside the header. */
+  .drawer-contact-group { align-self: stretch; }
 
   /* v0.10.1 — Drawer header rebuilt per locked spec. Old .drawer-meta
-     (budget · zone · type · timeline) retired — that data moved to
-     Infos tab. New structure: campaign line · chip row · contact row. */
+     (budget · zone · type · timeline) retired — that data moved to the
+     Infos tab. v0.14.0 (ADR-0007): header = identity + qualification; the
+     campaign moved out of the header to the Meta card's head strip
+     (.meta-card-head). Structure: top row (avatar + name) · chip row
+     (source · type · Statut · Score) · titled Contact block. */
 
-  /* Campaign name: megaphone icon + text, row 2 of the header. Muted
-     tone so it reads as attribution metadata, not primary lead data.
-     Treats empty/"—" campaign as "don't render" — handled in JSX. */
-  /* v0.13.5 (§2.3a) — campaign demoted to the quietest LAST line of the
-     header, below the contact info (it's attribution metadata, not primary
-     lead data). A single hairline separates "who they are + how to reach
-     them" from "where they came from". Tone dropped to muted. Rendered last
-     in the header DOM so reading order matches the visual order. */
-  .drawer-campaign {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 2px 0 0;
-    padding-top: 12px;
-    border-top: 1px solid var(--border-subtle);
-    font-size: 12px;
-    color: var(--text-muted);
-    line-height: 1.45;
-    min-width: 0;
-  }
-  .drawer-campaign svg {
-    width: 14px;
-    height: 14px;
-    stroke: var(--text-muted);
-    fill: none;
-    stroke-width: 1.75;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    flex-shrink: 0;
-  }
-  .drawer-campaign span {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-  }
-
-  /* Chip row: source · type · score, row 3 of the header. Three chips,
-     similar visual weight, each with a distinct job. Source = where
-     they came from; Type = buyer/seller (type-accent palette); Score
-     = how hot.
-
-     v0.10.2 — drawer-scoped override: strip the circle container on
-     the source chip when it's inside this row, so all 4 drawer icons
-     (campaign megaphone, source, phone, mail) read as a coherent
-     family of naked stroke icons. The mobile card keeps the full
-     source-chip pill treatment via the unscoped .source-chip rule. */
+  /* Chip row — source · type · Statut · Score. v0.14.0: Statut and Score are
+     inline dropdowns (.status-pill / .score-pill) sitting alongside the static
+     source + type chips; align-items centres the slightly taller pills. */
   .drawer-chip-row {
     display: flex;
     align-items: center;
@@ -1255,14 +1219,12 @@
     margin: 0;
     flex-wrap: wrap;
   }
-  /* v0.13.5 (§2.3a) — chip family harmonised. Source was a naked stroke icon
-     while Type/Score were filled pills (three visual weights). All three now
-     read as one pill family: same height, radius, padding, weight — aligned
-     with the status/verify badge sizing system. Tints still differ by meaning
-     (neutral source · blue Acquéreur · tonal Score). */
+  /* v0.14.0 (ADR-0007) — source + type read as one chip family (same height,
+     radius, padding, weight), aligned with the Statut/Score dropdown pills that
+     follow them on the line. Tints differ by meaning (neutral source · blue
+     Acquéreur). */
   .drawer-chip-row .source-chip,
-  .drawer-chip-row .type-chip,
-  .drawer-chip-row .score-chip {
+  .drawer-chip-row .type-chip {
     height: 22px;
     padding: 0 9px;
     border-radius: var(--r-pill);
@@ -1283,8 +1245,6 @@
     height: 13px;
     stroke-width: 1.85;
   }
-  .drawer-chip-row .score-chip { gap: 5px; }
-  .drawer-chip-row .score-chip .score-chip-dot { width: 7px; height: 7px; }
 
   /* Type chip — buyer/seller identifier with type-accent palette,
      echoing the Leads page 4px top band color. Text-only, no icon. */
@@ -1419,7 +1379,7 @@
   }
 
   /* ── v0.11.2 — Centre d'action drawer body (3 tabs) ──────────────── */
-  /* v0.13.5 — divider model (V1_SCOPE §2.3a): hairlines separate drawer
+  /* v0.14.0 — divider model (V1_SCOPE §2.3a): hairlines separate drawer
      SECTIONS only, never individual rows. Each grouped block is a
      .drawer-section; the rule below draws one section divider between
      consecutive sections, drawer-wide. */
@@ -1493,39 +1453,52 @@
   .qual-chip--warm.qual-chip--on { background: #FAEEDA; color: #854F0B; border-color: #F5B94C; }
   .qual-chip--cold.qual-chip--on { background: #E6F1FB; color: #0C447C; border-color: #85B7EB; }
 
-  /* Verbatim form Q&A, read-only reference (v0.12.0). v0.13.5 (§2.3a):
-     answers are grouped into labelled sections; within a group, rows are
-     separated by whitespace only — no per-row hairlines. .meta-group sets
-     the intra-group rhythm; .meta-qa is now a borderless stacked pair. */
-  .meta-group { display: flex; flex-direction: column; gap: 13px; }
+  /* Verbatim form Q&A, read-only reference (v0.12.0). v0.14.0: the record now
+     sits on a white card (panel surface + table radius) so it has weight on the
+     grey body, with the campaign as the card's head strip — see .meta-card.
+     Rows separated by whitespace only, no tags, one coherent answer type. */
+  .meta-card {
+    background: var(--panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  /* Campaign head strip — labels where the record came from, titles the card. */
+  .meta-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    line-height: 1.3;
+  }
+  .meta-card-head svg {
+    width: 15px; height: 15px;
+    stroke: var(--text-muted);
+    fill: none;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .meta-card-head span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta-card-body { padding: 16px; }
+  .meta-group { display: flex; flex-direction: column; gap: 16px; }
   .meta-qa { padding: 0; border: 0; }
   .meta-q {
     font-size: 12px;
     font-weight: 500;
-    color: var(--text-muted);
-    margin-bottom: 3px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
   }
   .meta-a {
     font-size: 14px;
-    color: var(--text-body);
-    line-height: 1.45;
-  }
-  /* Budget & Timing render as tags inside the form record (§2.3a) — colour +
-     rhythm instead of a grey text wall. .timing-tag shares the table's
-     .budget-tag family; both sit slightly larger here than in the table row. */
-  .meta-a .budget-tag,
-  .meta-a .timing-tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 10px;
-    border-radius: 8px;
-    background: var(--surface-tint);
-    border: 1px solid var(--border-subtle);
-    font-size: 13px;
-    font-weight: 600;
     color: var(--text-primary);
-    letter-spacing: -0.1px;
-    line-height: 1.3;
+    line-height: 1.45;
   }
   .meta-empty {
     font-size: 13px;
@@ -1845,6 +1818,67 @@
   .status-menu-item--on { font-weight: 600; }
   .status-menu-item .status-check { margin-left: auto; display: inline-flex; }
   .status-menu-item .status-check svg { width: 15px; height: 15px; color: var(--accent-blue); }
+
+  /* Score inline dropdown — coloured pill + instant menu, mirrors the Statut
+     control so the two read as one dropdown family on the qualification line. */
+  .score-wrap { position: relative; display: inline-flex; }
+  .score-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px 3px 9px;
+    border: 0;
+    border-radius: var(--r-pill);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.1px;
+    line-height: 1.3;
+    cursor: pointer;
+    max-width: 100%;
+  }
+  .score-pill .score-pill-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .score-pill svg { width: 13px; height: 13px; opacity: 0.65; flex-shrink: 0; }
+  .score-pill--hot  { background: #FCEBEB; color: #A32D2D; }
+  .score-pill--hot  .score-chip-dot { background: #E24B4A; }
+  .score-pill--warm { background: #FAEEDA; color: #854F0B; }
+  .score-pill--warm .score-chip-dot { background: #F5B94C; }
+  .score-pill--cold { background: #E6F1FB; color: #0C447C; }
+  .score-pill--cold .score-chip-dot { background: #85B7EB; }
+  .score-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 40;
+    min-width: 150px;
+    padding: 5px;
+    background: var(--panel);
+    border: 1px solid var(--border-divider);
+    border-radius: var(--r-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  }
+  .score-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    padding: 8px 9px;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-body);
+    text-align: left;
+    cursor: pointer;
+  }
+  .score-menu-item:hover { background: var(--surface-tint); }
+  .score-menu-item--on { font-weight: 600; }
+  .score-dot--hot  { background: #E24B4A; }
+  .score-dot--warm { background: #F5B94C; }
+  .score-dot--cold { background: #85B7EB; }
+  .score-menu-item .score-check { margin-left: auto; display: inline-flex; }
+  .score-menu-item .score-check svg { width: 15px; height: 15px; color: var(--accent-blue); }
 
   /* Leads table card — contained Prodex-style card. Whole table (header +
      column labels + rows) lives inside one surface. Click a row → drawer.
@@ -2773,7 +2807,6 @@
       align-items: flex-start;
     }
     .drawer-name { font-size: 17px; }
-    .drawer-campaign { font-size: 12px; }
     .drawer-contact-item { font-size: 12px; }
     .drawer-tabs {
       padding: 0 16px;
@@ -2784,12 +2817,12 @@
     .drawer-tab { white-space: nowrap; }
     .drawer-body { padding: 16px; }
     /* On mobile: close button stays on the LEFT (native iOS/Android back pattern)
-       and renders as a back-arrow. Reset the desktop order:2 that pushes it right.
-       v0.13.5 — avatar sits between the back-arrow and the name. */
-    .drawer-close { order: 0; }
-    .drawer-header > .avatar { order: 1; margin-top: 0; }
-    .drawer-header-text { order: 2; }
-    .drawer-header { gap: 10px; }
+       and renders as a back-arrow. v0.14.0 — header is a column; the back-arrow
+       leads the top row (order 0), then avatar, then name. */
+    .drawer-close { order: 0; margin-left: 0; }
+    .drawer-header-top > .avatar { order: 1; }
+    .drawer-name { order: 2; }
+    .drawer-header { gap: 12px; }
 
     /* On mobile, lock body scroll behind the drawer */
     body[data-drawer-open="true"] { overflow: hidden; }
@@ -2822,7 +2855,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.13.5";
+const APP_VERSION = "v0.14.0";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -2898,6 +2931,7 @@ const state = {
   agencySwitcherOpen: false, // sidebar dropdown
   userMenuOpen: false,       // topbar dropdown
   openStatusMenu: null,      // v0.13.0 inline Statut dropdown open-state. v0.13.2: { id, surface } — surface "row" (table/card) or "drawer", so the same lead's row menu and drawer menu don't open together
+  openScoreMenu: null,       // inline Score dropdown open-state, same { id, surface } shape (drawer header qualification line)
   drawer: null,              // null | { leadId, tab: "infos"|"messages"|"notes" }  (v0.11.2: infos/messages/notes; v0.12.0 added "meta"; v0.13.2 folded "meta" into infos — back to 3)
 
   // Leads page state — consumed by the toggle, page search, filter tabs,
@@ -3984,6 +4018,49 @@ function renderScoreChip(score, leadId) {
   return `<span class="score-chip score-chip--${m.mod}">${inner}</span>`;
 }
 
+/* Score dropdown control — coloured pill + instant menu (Chaud/Tiède/Froid),
+   mirroring renderStatusCell. Used on the drawer header qualification line so
+   Statut and Score read as one dropdown family. Reuses the set-score handler
+   (same lead.score field as the table's click-to-cycle, so they stay in sync);
+   opts.surface keys the open-state independently per surface. */
+function renderScoreCell(lead, opts = {}) {
+  const surface = opts.surface || "row";
+  const map = {
+    hot:  { label: "Chaud", mod: "hot"  },
+    warm: { label: "Tiède", mod: "warm" },
+    cold: { label: "Froid", mod: "cold" },
+  };
+  const m = map[lead.score] || { label: lead.score || "—", mod: "none" };
+  const open = state.openScoreMenu;
+  const isOpen = !!open && open.id === lead.id && open.surface === surface;
+  const opts3 = [
+    { v: "hot",  label: "Chaud", mod: "hot"  },
+    { v: "warm", label: "Tiède", mod: "warm" },
+    { v: "cold", label: "Froid", mod: "cold" },
+  ];
+  const menu = isOpen ? `
+    <div class="score-menu" role="listbox">
+      ${opts3.map(o => {
+        const on = o.v === lead.score;
+        return `<button class="score-menu-item${on ? " score-menu-item--on" : ""}"
+                        role="option" aria-selected="${on}"
+                        data-action="set-score" data-lead-id="${lead.id}" data-score="${o.v}">
+          <span class="score-chip-dot score-dot--${o.mod}"></span>${o.label}${on ? `<span class="score-check">${icon.check()}</span>` : ""}
+        </button>`;
+      }).join("")}
+    </div>` : "";
+  return `
+    <span class="score-wrap">
+      <button class="score-pill score-pill--${m.mod}" data-action="toggle-score-menu" data-lead-id="${lead.id}" data-surface="${surface}"
+              aria-haspopup="listbox" aria-expanded="${isOpen}" title="Changer le score">
+        <span class="score-chip-dot"></span>
+        <span class="score-pill-label">${m.label}</span>
+        ${icon.chevronDown()}
+      </button>
+      ${menu}
+    </span>`;
+}
+
 /* Statut cell (v0.13.0) — the inline-editable status control for the table
    and mobile card. Renders a coloured pill showing the current stage; click
    opens an instant dropdown of the 4 buyer stages (Greg docx brief: "dropdown
@@ -4485,10 +4562,11 @@ function mergeTemplate(tpl, lead) {
 function waDigits(phone) { return (phone || "").replace(/\D/g, ""); }
 
 /* Qualification chips (v0.11.2) — Chaud/Tiède/Froid as coloured selectable
-   chips inside the drawer Infos tab. Writes the SAME lead.score the table
-   cycles (V1_SCOPE §2.3). Active chip = current score; tap sets it directly
-   (data-action="set-score"). Chosen over a dropdown to honour Greg's
-   "visuel + couleur" and stay consistent with the table score badge. */
+   chips. Writes the SAME lead.score the table cycles + the new score dropdown
+   sets (V1_SCOPE §2.3, data-action="set-score").
+   DORMANT in V1 (since the drawer redesign): no current call sites — the drawer
+   qualification line now uses renderScoreCell (a Score dropdown) to match the
+   Statut dropdown. Kept as the chip-style primitive for a re-enabled surface. */
 function renderQualChips(lead) {
   const opts = [
     { v: "hot",  label: "Chaud", mod: "hot"  },
@@ -4522,59 +4600,32 @@ function drawerInfoRow(label, value) {
     </div>`;
 }
 
-/* Meta form record (v0.12.0; moved into the Infos tab at v0.13.2, ADR-0006;
-   regrouped at v0.13.5 per V1_SCOPE §2.3a). Renders the verbatim Lead Ads
-   record from lead.formResponses — SAME data, same source of truth — but
-   clustered into labelled sections instead of one flat ribbon. Within a group
-   the rows are separated by whitespace only (no per-row hairlines); section
-   dividers (drawer-wide CSS) separate the groups. Budget and Timing render as
-   tags rather than grey text. Any answer whose question isn't in a known group
-   falls through to "Autres" so nothing is dropped if the backend adds fields.
-   Pure render relocation — no data-model change, no ADR (§2.3a). */
-const META_GROUPS = [
-  { label: "Le projet",      qs: ["Projet d'acquisition", "Secteur recherché", "Caractéristiques spécifiques"] },
-  { label: "Budget & délai", qs: ["Budget", "Timing projet"] },
-  { label: "Contact",        qs: ["Souhaite être contacté"] },
-];
-// Questions whose answer renders as a coloured tag (the table's tag family).
-const META_TAG_CLASS = { "Budget": "budget-tag", "Timing projet": "timing-tag" };
-
-function renderMetaAnswer(r) {
-  const tag = META_TAG_CLASS[r.question];
-  const val = r.answer || "—";
-  if (tag && r.answer) return `<div class="meta-a"><span class="${tag}">${val}</span></div>`;
-  return `<div class="meta-a">${val}</div>`;
-}
-
-function renderMetaResponses(lead) {
+/* Meta form record (v0.12.0; moved into the Infos tab at v0.13.2, ADR-0006).
+   v0.14.0: rendered on a white card (panel + table radius) so the record has
+   weight on the grey body. The campaign is the card's head strip (megaphone +
+   name) — it titles the card and gives the campaign a job; the Q&A sits in the
+   card body, question-above-answer, whitespace between rows, no tags, one
+   coherent answer type. SAME data/source of truth. Empty-safe. No data-model
+   change. campaign is "" when absent → the head strip is omitted. */
+function renderMetaResponses(lead, campaign) {
   const responses = lead.formResponses || [];
-  if (!responses.length) {
-    return `<div class="drawer-section"><p class="meta-empty">Aucune réponse de formulaire enregistrée pour ce lead.</p></div>`;
-  }
-  const used = new Set();
-  const section = (label, items) => {
-    if (!items.length) return "";
-    const rows = items.map(r => `
-      <div class="meta-qa">
-        <div class="meta-q">${r.question}</div>
-        ${renderMetaAnswer(r)}
-      </div>`).join("");
-    return `
-      <div class="drawer-section">
-        <div class="drawer-section-label">${label}</div>
-        <div class="meta-group">${rows}</div>
-      </div>`;
-  };
-  const out = META_GROUPS.map(g => {
-    const items = g.qs
-      .map(q => responses.find(r => r.question === q))
-      .filter(Boolean);
-    items.forEach(r => used.add(r));
-    return section(g.label, items);
-  });
-  const leftovers = responses.filter(r => !used.has(r));
-  if (leftovers.length) out.push(section("Autres", leftovers));
-  return out.join("");
+  const head = campaign ? `
+    <div class="meta-card-head">
+      ${icon.megaphone()}
+      <span>${campaign}</span>
+    </div>` : "";
+  const inner = responses.length
+    ? `<div class="meta-group">${responses.map(r => `
+        <div class="meta-qa">
+          <div class="meta-q">${r.question}</div>
+          <div class="meta-a">${r.answer || "—"}</div>
+        </div>`).join("")}</div>`
+    : `<p class="meta-empty">Aucune réponse de formulaire enregistrée pour ce lead.</p>`;
+  return `
+    <div class="meta-card">
+      ${head}
+      <div class="meta-card-body">${inner}</div>
+    </div>`;
 }
 
 function renderDrawer() {
@@ -4586,11 +4637,11 @@ function renderDrawer() {
   // (ADR-0003). v0.12.0 split the Meta form record into its own "Réponses
   // Meta" tab (ADR-0004); v0.13.2 folds it back into Infos and drops that
   // tab (ADR-0006), so Infos now holds the verbatim form Q&A + Qualification
-  // rapide (Statut dropdown + Score chips). v0.13.5 reworks the header
-  // (V1_SCOPE §2.3a): tone-coloured 40px avatar left of the name, even
-  // vertical rhythm, campaign demoted to the quietest last line below the
-  // contact info (with a hairline above it), and the source/type/score chip
-  // family harmonised into one pill family.
+  // rapide. v0.14.0 (ADR-0007) locks the drawer IA: header carries identity
+  // (avatar + name) and qualification — source · type · Statut · Score on the
+  // chip line, Statut and Score as inline dropdowns — plus a titled Contact
+  // block; no separator lines. The Infos body is the verbatim Meta record on a
+  // white card with the campaign as the card's head strip.
   if (!state.drawer) return "";
   const lead = state.leads.find(l => l.id === state.drawer.leadId);
   if (!lead) return "";
@@ -4601,30 +4652,14 @@ function renderDrawer() {
     { id: "messages", label: "Messages rapides" },
     { id: "notes",    label: "Notes" },
   ];
-  const statusC = stageColors(lead.status);
   const campaign = lead.campaign && lead.campaign !== "—" ? lead.campaign : "";
 
   // ── Tab bodies ───────────────────────────────────────────────────────
-  // Infos (v0.13.2) = the full lead in one surface: the verbatim Meta form
-  // record (six stacked Q&A) on top, then Qualification rapide at the bottom
-  // holding the two editable fields — Statut (inline dropdown, opens upward
-  // here) and Score (the Chaud/Tiède/Froid chips). The old Budget·Secteur·
-  // Timing decision-facts strip is dropped: those three values now live in
-  // the Q&A answers (that strip was the duplication ADR-0004 flagged; ADR-0006
-  // removes it). Name/phone/email + badges stay in the header.
+  // Infos: the Meta record on a white card, with the campaign as its head
+  // strip. Qualification (Statut + Score) lives in the header. Mobile adds the
+  // icon legend below the card.
   const infosBody = `
-    ${renderMetaResponses(lead)}
-    <div class="drawer-section">
-      <div class="drawer-section-label">Qualification rapide</div>
-      <div class="qual-row">
-        <div class="qual-sublabel">Statut</div>
-        ${renderStatusCell(lead, { surface: "drawer", menuUp: true })}
-      </div>
-      <div class="qual-row">
-        <div class="qual-sublabel">Score</div>
-        ${renderQualChips(lead)}
-      </div>
-    </div>
+    ${renderMetaResponses(lead, campaign)}
     ${isMobile() ? renderIconLegend() : ""}`;
 
   // Messages rapides: 4 actions. Templates merged at render time and handed
@@ -4662,42 +4697,39 @@ function renderDrawer() {
   return `
     <aside class="drawer" data-open="true" role="dialog" aria-label="Centre d'action">
       <div class="drawer-header">
-        ${renderAvatar(lead.initials, lead.tone, 40)}
-        <div class="drawer-header-text">
-          <div class="drawer-name">
-            ${lead.name}
-            <span class="drawer-badge" style="background:${statusC.bg};color:${statusC.fg};">${stageLabel(lead.type, lead.status)}</span>
-          </div>
+        <div class="drawer-header-top">
+          <button class="icon-btn drawer-close" data-action="close-drawer" aria-label="Fermer">
+            ${isMobile() ? icon.arrowLeft() : icon.close()}
+          </button>
+          ${renderAvatar(lead.initials, lead.tone, 40)}
+          <div class="drawer-name">${lead.name}</div>
+        </div>
+        <div class="drawer-header-meta">
           <div class="drawer-chip-row">
             ${renderSourceIcon(lead.source)}
             ${renderTypeChip(lead.type)}
-            ${renderScoreChip(lead.score)}
+            ${renderStatusCell(lead, { surface: "drawer", menuUp: false })}
+            ${renderScoreCell(lead, { surface: "drawer" })}
           </div>
-          <div class="drawer-contact">
-            <a class="drawer-contact-item" href="tel:${lead.phone.replace(/\s/g, "")}">
-              ${icon.phone()}
-              <span class="drawer-contact-text">${lead.phone}</span>
-              ${renderVerifyBadge(lead.phoneVerified)}
-            </a>
-            <a class="drawer-contact-item drawer-contact-email"
-               data-action="copy-email"
-               data-email="${lead.email}"
-               title="Cliquer pour copier"
-               href="#">
-              ${icon.mail()}
-              <span class="drawer-contact-text">${lead.email}</span>
-            </a>
-          </div>
-          ${campaign ? `
-            <div class="drawer-campaign">
-              ${icon.megaphone()}
-              <span>${campaign}</span>
+          <div class="drawer-contact-group">
+            <div class="drawer-section-label">Contact</div>
+            <div class="drawer-contact">
+              <a class="drawer-contact-item" href="tel:${lead.phone.replace(/\s/g, "")}">
+                ${icon.phone()}
+                <span class="drawer-contact-text">${lead.phone}</span>
+                ${renderVerifyBadge(lead.phoneVerified)}
+              </a>
+              <a class="drawer-contact-item drawer-contact-email"
+                 data-action="copy-email"
+                 data-email="${lead.email}"
+                 title="Cliquer pour copier"
+                 href="#">
+                ${icon.mail()}
+                <span class="drawer-contact-text">${lead.email}</span>
+              </a>
             </div>
-          ` : ""}
+          </div>
         </div>
-        <button class="icon-btn drawer-close" data-action="close-drawer" aria-label="Fermer">
-          ${isMobile() ? icon.arrowLeft() : icon.close()}
-        </button>
       </div>
       <div class="drawer-tabs" role="tablist">
         ${tabs.map(t => `
@@ -4764,6 +4796,11 @@ document.addEventListener("click", (e) => {
     setState({ openStatusMenu: null });
   }
 
+  // outside-click closes the inline Score dropdown
+  if (state.openScoreMenu != null && !e.target.closest(".score-wrap")) {
+    setState({ openScoreMenu: null });
+  }
+
   const target = e.target.closest("[data-action], [data-route]");
   if (!target) return;
 
@@ -4776,6 +4813,7 @@ document.addEventListener("click", (e) => {
       agencySwitcherOpen: false,
       userMenuOpen: false,
       openStatusMenu: null,
+      openScoreMenu: null,
     });
     return;
   }
@@ -4918,8 +4956,19 @@ document.addEventListener("click", (e) => {
       const lead = state.leads.find(l => l.id === id);
       if (lead && SCORE_CYCLE.includes(score)) {
         lead.score = score;
-        setState({});
+        setState({ openScoreMenu: null });
       }
+      break;
+    }
+    case "toggle-score-menu": {
+      // Open/close the inline Score dropdown for this lead+surface. Mirrors
+      // toggle-status-menu; the pill is its own [data-action] so a row-click
+      // underneath never fires.
+      const id = Number(target.getAttribute("data-lead-id"));
+      const surface = target.getAttribute("data-surface") || "row";
+      const cur = state.openScoreMenu;
+      const same = !!cur && cur.id === id && cur.surface === surface;
+      setState({ openScoreMenu: same ? null : { id, surface } });
       break;
     }
     case "toggle-status-menu": {
