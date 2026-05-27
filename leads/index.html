@@ -1,5 +1,41 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.16.0
+  Bulk-actions cycle (post-Greg-demo polish) + mobile dropdown fixes. Mobile:
+  Score and Statut row/card menus now anchor to the pill's right edge
+  (score-menu--end / status-menu--end), and the Filters panel anchors to the
+  left of its button on ≤768px so it no longer opens off-screen left. Bulk
+  action bar rebuilt: Assigner + Archiver dropped (no agent model in V1; archive
+  duplicates Statut "Perdu"), Statut + Score wired as real popovers above the
+  bar (same .status-menu / .score-menu family with --up), Supprimer guarded
+  by a native confirm. Default sort flipped to date-desc so the freshest leads
+  land first. Four dummy leads (ids 8/9/18/22) re-attributed to Meta sources +
+  real campaign names so V1 stays Meta-only end-to-end. See CHANGELOG v0.16.0
+  and ADR-0011.
+
+  Open House Leads — v0.15.1
+  Docs-only hygiene cycle (app unchanged except the APP_VERSION string). Full
+  documentation audit: rewrote the ~5-versions-stale leads/README.md to the
+  v0.15.0 build; absorbed the filters→V1 / export→V2 scope move into PARKED;
+  fixed dead HANDOFF §7/§10/§4 cross-refs (PARKED, TOKENS); refreshed the
+  ~4100→~5,500 line-count drift; documented the score `none` value in
+  DATA_MODEL. Findings logged in appendix/V0.15_AUDIT_NOTES.md. See CHANGELOG
+  v0.15.1.
+
+  Open House Leads — v0.15.0
+  Table-completion cycle (Greg Update 26-05 (2) + the filters→V1 scope move).
+  Layout/logic on dummy data; no backend, no framework, no data-model change.
+  Score is now an inline dropdown in the table + mobile card (the drawer's
+  renderScoreCell) — one control on every surface, all writing the same
+  lead.score; a grey "Non évalué" unscored state is added (SCORE_VALUES, sorts
+  last). Statut "Nouveau" is now grey (never-treated). Pagination at 20/page
+  slices computeLeadsView and resets to page 1 on any view change. A Filters
+  panel (Statut · Score · Date presets) drives the same computeLeadsView. The
+  "Non assignés" quick-filter card is dropped (the quick-filter row
+  renderStageCards was already uncalled — left dormant); renderScoreChip +
+  cycle-score go DORMANT. 20 demo buyer leads added (ids 13–32) for volume.
+  See CHANGELOG v0.15.0 and ADR-0008 / 0009 / 0010.
+
   Open House Leads — v0.14.0
   Drawer redesign — locked (ADR-0007; closes V1_SCOPE §2.3a). Layout/CSS plus
   one new render control; no data-model change. Header: tone-coloured 40px
@@ -180,7 +216,7 @@
 
   --- still to come in the V1 line ---
     polish : H1 prefix resolved at v0.13.1 ("Prospects ·" → "Leads ·").
-             Default sort date-desc still pending.
+             Default sort resolved at v0.16.0 (date desc).
 
   === prior cycle: v0.10.6 — Report content refresh (master-zip lockstep) ===
 
@@ -1799,6 +1835,11 @@
      section, which sits at the bottom of the scrollable drawer body where a
      downward menu would clip. */
   .status-menu--up { top: auto; bottom: calc(100% + 4px); }
+  /* v0.15.2 — opens leftward from the pill's right edge; used on the
+     row/card surface where the Statut pill sits near the right edge of the
+     row (mobile card especially), so left-anchored would clip the viewport
+     and cover the action-icon column. Drawer keeps left-anchor (header). */
+  .status-menu--end { left: auto; right: 0; }
   .status-menu-item {
     display: flex;
     align-items: center;
@@ -1878,6 +1919,11 @@
   .score-menu-item:hover { background: var(--surface-tint); }
   .score-menu-item--on { font-weight: 600; }
   .score-menu--up { top: auto; bottom: calc(100% + 4px); }
+  /* v0.15.2 — mirrors .status-menu--end: row/card surface anchors the menu
+     to the pill's right edge so it opens leftward, since the Score pill
+     lives near the right edge of the row (mobile especially). Drawer keeps
+     left-anchor (header). */
+  .score-menu--end { left: auto; right: 0; }
   .score-dot--hot  { background: #E24B4A; }
   .score-dot--warm { background: #F5B94C; }
   .score-dot--cold { background: #85B7EB; }
@@ -2303,6 +2349,12 @@
     color: var(--text-primary);
   }
   .leads-bulk-bar-clear svg { width: 16px; height: 16px; stroke-width: 2; }
+  /* v0.16 — wrapper for the Statut/Score popovers above the bulk bar.
+     Mirrors .status-wrap / .score-wrap (inline-flex + position: relative).
+     The popovers reuse .status-menu / .score-menu with the existing --up
+     modifier (the bulk bar sits at the bottom of the table card, so the
+     menu opens upward). */
+  .bulk-menu-wrap { position: relative; display: inline-flex; }
 
   .leads-col { min-width: 0; }
   .leads-col--nom {
@@ -2840,6 +2892,13 @@
     }
     .leads-updated-meta { flex: 1 1 100%; margin-left: 0; }
 
+    /* v0.15.2 — on mobile the toolbar wraps and the Filtrer button reflows
+       to the left (.leads-table-header-actions justify-content: flex-start
+       above). The default right:0 then anchors the panel off-screen left.
+       Flip to left:0 so the panel opens rightward from the button; the
+       base max-width: calc(100vw - 40px) keeps it clamped. */
+    .leads-filter-panel { right: auto; left: 0; }
+
     /* v0.10.3 — V11 mode card goes full-width on mobile so both
        halves get generous tap targets; title scales down. */
     .leads .leads-mode-card { display: grid; width: 100%; }
@@ -2965,7 +3024,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.14.0";
+const APP_VERSION = "v0.16.0";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -3059,10 +3118,12 @@ const state = {
   leadType:    "buyer",      // "buyer" | "seller" — drives toggle + pipeline lookup
   filterTab:   "all",        // "all" | pipeline stage id | "lost"
   leadsSearch: "",           // page-scoped search query
-  // Column sort (v0.9.0). null = default order (by id). When set: { column, direction }.
+  // Column sort (v0.9.0). When set: { column, direction }.
   // column ∈ "name" | "budget" | "zone" | "score" | "agent" | "date"
   // direction ∈ "asc" | "desc"
-  leadsSort: null,
+  // v0.16 — default is date-desc so the freshest leads land at the top
+  // (was null = insertion order, flagged as a known item in STATUS).
+  leadsSort: { column: "date", direction: "desc" },
   // v0.15 — pagination. 1-based current page; sliced off computeLeadsView's
   // visible list. Reset to 1 on any view change (sort, search, filter, status/
   // score edit, type flip) so the user never lands on a now-empty page.
@@ -3078,6 +3139,11 @@ const state = {
   // not "these that happen to be visible". Exit mode via Annuler or ESC.
   selectionMode: false,
   selectedLeadIds: [],
+  // v0.16 — bulk action popover open-state. null | "status" | "score". Drives
+  // the popovers above the Statut/Score buttons in the bulk action bar; same
+  // family as openStatusMenu/openScoreMenu but bar-scoped (one popover at a
+  // time, no per-lead id since the action applies to all selectedLeadIds).
+  bulkMenu: null,
 
   // Team roster. IDs used by lead.assignedAgentId.
   team: [
@@ -3154,12 +3220,12 @@ const state = {
         { type: "call", at: "2026-04-06T15:30:00Z", by: 1 },
         { type: "note", at: "2026-04-06T16:00:00Z", by: 1 },
       ] },
-    { id: 8,  type: "buyer", initials: "LF", tone: "#64748B", name: "Lucas Fontaine",       email: "l.fontaine@gmail.com",   phone: "+33 6 67 89 01 23", phoneVerified: false, budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Paris 19e", timeline: "Plus de 6 mois",           projectType: "Pied-à-terre", contactPreference: "Pas pour le moment",         features: ["Autre"], status: "lost",           score: "cold", source: "web",    assignedAgentId: 2,    campaign: "—",                  createdAt: daysAgoISO(21, 23, 47), notes: "Budget insuffisant pour le secteur.",
+    { id: 8,  type: "buyer", initials: "LF", tone: "#64748B", name: "Lucas Fontaine",       email: "l.fontaine@gmail.com",   phone: "+33 6 67 89 01 23", phoneVerified: false, budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Paris 19e", timeline: "Plus de 6 mois",           projectType: "Pied-à-terre", contactPreference: "Pas pour le moment",         features: ["Autre"], status: "lost",           score: "cold", source: "fb",     assignedAgentId: 2,    campaign: "Boulogne Actifs",    createdAt: daysAgoISO(21, 23, 47), notes: "Budget insuffisant pour le secteur.",
       activity: [
         { type: "call", at: "2026-04-04T10:00:00Z", by: 2 },
         { type: "note", at: "2026-04-04T10:10:00Z", by: 2 },
       ] },
-    { id: 9,  type: "buyer", initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Dans un mois", features: ["Autre"], status: "a_contacter",      score: "warm", source: "email",  assignedAgentId: null, campaign: "—",                  createdAt: daysAgoISO(6, 19, 15), notes: "Formulaire site web. Rappeler en soirée.",
+    { id: 9,  type: "buyer", initials: "NE", tone: "#10B981", name: "Nadia El Amrani",      email: "nadia.ea@gmail.com",     phone: "+33 7 78 90 12 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Dans un mois", features: ["Autre"], status: "a_contacter",      score: "warm", source: "ig",     assignedAgentId: null, campaign: "Le Marais Prestige", createdAt: daysAgoISO(6, 19, 15), notes: "Rappeler en soirée.",
       activity: [
         { type: "call", at: "2026-04-08T19:15:00Z", by: null },
       ] },
@@ -3176,20 +3242,20 @@ const state = {
     // (dormant V1). Dates span today / 7j / 30j / this-month / older.
     { id: 13, type: "buyer", initials: "AL", tone: "#0EA5E9", name: "Amélie Laurent",      email: "amelie.laurent@gmail.com", phone: "+33 6 11 22 33 44", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 5e",  timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien"],                          status: "nouveau",       score: "none", source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(0, 8, 12),  notes: "" },
     { id: 14, type: "buyer", initials: "TR", tone: "#A855F7", name: "Thomas Rivière",      email: "t.riviere@outlook.fr",     phone: "+33 6 22 33 44 55", phoneVerified: false, budget: "2M–4M",      secteur: "Rive droite centre", zone: "Paris 3e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Dans un mois",      features: ["Vue dégagée", "Autre"],                        status: "nouveau",       score: "none", source: "fb",     assignedAgentId: null, campaign: "Le Marais Prestige",  createdAt: daysAgoISO(0, 9, 40),  notes: "" },
-    { id: 15, type: "buyer", initials: "SG", tone: "#14B8A6", name: "Sarah Guérin",        email: "sarah.guerin@free.fr",     phone: "+33 7 33 44 55 66", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "warm", source: "web",    assignedAgentId: null, campaign: "Batignolles Familles", createdAt: daysAgoISO(2, 14, 5),  notes: "Recherche un T3 lumineux." },
+    { id: 15, type: "buyer", initials: "SG", tone: "#14B8A6", name: "Sarah Guérin",        email: "sarah.guerin@free.fr",     phone: "+33 7 33 44 55 66", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "warm", source: "ig",     assignedAgentId: null, campaign: "Batignolles Familles", createdAt: daysAgoISO(2, 14, 5),  notes: "Recherche un T3 lumineux." },
     { id: 16, type: "buyer", initials: "KB", tone: "#EF4444", name: "Karim Benali",        email: "k.benali@gmail.com",       phone: "+33 6 44 55 66 77", phoneVerified: true,  budget: "2M–4M",      secteur: "Rive droite ouest",  zone: "Paris 8e",  timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "contacte",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Madeleine",  createdAt: daysAgoISO(4, 11, 18), notes: "Très motivé, dispo cette semaine." },
     { id: 17, type: "buyer", initials: "ED", tone: "#6366F1", name: "Élodie Dumas",        email: "elodie.d@icloud.com",      phone: "+33 7 55 66 77 88", phoneVerified: false, budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 6e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Pas pour le moment", features: ["Architecture contemporaine signée"],          status: "nouveau",       score: "none", source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(1, 16, 30), notes: "" },
-    { id: 18, type: "buyer", initials: "VM", tone: "#F97316", name: "Vincent Marchand",    email: "v.marchand@yahoo.fr",      phone: "+33 6 66 77 88 99", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite centre", zone: "Paris 4e",  timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "cold", source: "email",  assignedAgentId: null, campaign: "—",                  createdAt: daysAgoISO(6, 10, 0),  notes: "Budget serré, à recontacter." },
+    { id: 18, type: "buyer", initials: "VM", tone: "#F97316", name: "Vincent Marchand",    email: "v.marchand@yahoo.fr",      phone: "+33 6 66 77 88 99", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite centre", zone: "Paris 4e",  timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "cold", source: "fb",     assignedAgentId: null, campaign: "Le Marais Prestige", createdAt: daysAgoISO(6, 10, 0),  notes: "Budget serré, à recontacter." },
     { id: 19, type: "buyer", initials: "CL", tone: "#10B981", name: "Claire Lemoine",      email: "claire.lemoine@gmail.com", phone: "+33 7 77 88 99 00", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "visite_prevue", score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(3, 13, 22), notes: "Visite programmée jeudi." },
     { id: 20, type: "buyer", initials: "HP", tone: "#8B5CF6", name: "Hugo Petit",          email: "hugo.petit@outlook.fr",    phone: "+33 6 88 99 00 11", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Dans un mois",      features: ["Vue dégagée"],                                 status: "contacte",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(10, 9, 15), notes: "" },
     { id: 21, type: "buyer", initials: "NB", tone: "#E11D48", name: "Nora Brunel",         email: "nora.brunel@gmail.com",    phone: "+33 7 99 00 11 22", phoneVerified: false, budget: "2M–4M",      secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien"],                          status: "nouveau",       score: "none", source: "ig",     assignedAgentId: null, campaign: "Prestige Paris 17e", createdAt: daysAgoISO(0, 17, 50), notes: "" },
-    { id: 22, type: "buyer", initials: "OG", tone: "#0EA5E9", name: "Olivier Garnier",     email: "o.garnier@free.fr",        phone: "+33 6 10 20 30 40", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "hot",  source: "web",    assignedAgentId: null, campaign: "—",                  createdAt: daysAgoISO(12, 8, 5),  notes: "Rappeler en fin de journée." },
+    { id: 22, type: "buyer", initials: "OG", tone: "#0EA5E9", name: "Olivier Garnier",     email: "o.garnier@free.fr",        phone: "+33 6 10 20 30 40", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Le Marais Prestige", createdAt: daysAgoISO(12, 8, 5),  notes: "Rappeler en fin de journée." },
     { id: 23, type: "buyer", initials: "MJ", tone: "#A855F7", name: "Manon Joubert",       email: "manon.joubert@icloud.com", phone: "+33 7 20 30 40 50", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 5e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Pas pour le moment", features: ["Architecture contemporaine signée", "Autre"], status: "contacte",      score: "cold", source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(18, 11, 30), notes: "" },
     { id: 24, type: "buyer", initials: "RF", tone: "#14B8A6", name: "Raphaël Faure",       email: "r.faure@gmail.com",        phone: "+33 6 30 40 50 60", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "visite_prevue", score: "warm", source: "fb",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(8, 15, 0),  notes: "Couple, premier achat haut de gamme." },
     { id: 25, type: "buyer", initials: "LC", tone: "#6366F1", name: "Léa Chevalier",       email: "lea.chevalier@yahoo.fr",   phone: "+33 7 40 50 60 70", phoneVerified: false, budget: "2M–4M",      secteur: "Rive droite centre", zone: "Paris 2e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Dans un mois",      features: ["Vue dégagée"],                                 status: "nouveau",       score: "none", source: "ig",     assignedAgentId: null, campaign: "Le Marais Prestige",  createdAt: daysAgoISO(25, 10, 45), notes: "" },
-    { id: 26, type: "buyer", initials: "AM", tone: "#F97316", name: "Adrien Masson",       email: "a.masson@outlook.fr",      phone: "+33 6 50 60 70 80", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Boulogne",  timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "warm", source: "email",  assignedAgentId: null, campaign: "Boulogne Actifs",    createdAt: daysAgoISO(5, 18, 20), notes: "" },
+    { id: 26, type: "buyer", initials: "AM", tone: "#F97316", name: "Adrien Masson",       email: "a.masson@outlook.fr",      phone: "+33 6 50 60 70 80", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Boulogne",  timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "warm", source: "fb",     assignedAgentId: null, campaign: "Boulogne Actifs",    createdAt: daysAgoISO(5, 18, 20), notes: "" },
     { id: 27, type: "buyer", initials: "ZD", tone: "#10B981", name: "Zoé Delaunay",        email: "zoe.delaunay@gmail.com",   phone: "+33 7 60 70 80 90", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 6e",  timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien"],                          status: "contacte",      score: "hot",  source: "ig",     assignedAgentId: 2,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(15, 9, 10), notes: "Cherche du calme, étage élevé." },
-    { id: 28, type: "buyer", initials: "BT", tone: "#8B5CF6", name: "Benjamin Tessier",    email: "b.tessier@free.fr",        phone: "+33 6 70 80 90 01", phoneVerified: false, budget: "Moins de 1M", secteur: "Rive droite centre", zone: "Paris 10e", timeline: "Plus de 6 mois",            projectType: "Pied-à-terre",         contactPreference: "Pas pour le moment", features: ["Autre"],                                       status: "nouveau",       score: "cold", source: "web",    assignedAgentId: null, campaign: "—",                  createdAt: daysAgoISO(28, 12, 0), notes: "" },
+    { id: 28, type: "buyer", initials: "BT", tone: "#8B5CF6", name: "Benjamin Tessier",    email: "b.tessier@free.fr",        phone: "+33 6 70 80 90 01", phoneVerified: false, budget: "Moins de 1M", secteur: "Rive droite centre", zone: "Paris 10e", timeline: "Plus de 6 mois",            projectType: "Pied-à-terre",         contactPreference: "Pas pour le moment", features: ["Autre"],                                       status: "nouveau",       score: "cold", source: "fb",     assignedAgentId: null, campaign: "Le Marais Prestige", createdAt: daysAgoISO(28, 12, 0), notes: "" },
     { id: 29, type: "buyer", initials: "IF", tone: "#E11D48", name: "Inès Faivre",         email: "ines.faivre@icloud.com",   phone: "+33 7 80 90 01 12", phoneVerified: true,  budget: "2M–4M",      secteur: "Rive droite ouest",  zone: "Neuilly",   timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Vue dégagée", "Style haussmannien"],           status: "a_contacter",   score: "warm", source: "fb",     assignedAgentId: null, campaign: "Neuilly Familles",   createdAt: daysAgoISO(40, 14, 30), notes: "Lead plus ancien, relance à prévoir." },
     { id: 30, type: "buyer", initials: "GP", tone: "#0EA5E9", name: "Gabriel Perrot",      email: "g.perrot@gmail.com",       phone: "+33 6 90 01 12 23", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "contacte",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(55, 10, 0), notes: "Recherche pied-à-terre familial." },
     { id: 31, type: "buyer", initials: "MD", tone: "#A855F7", name: "Margaux Didier",      email: "m.didier@outlook.fr",      phone: "+33 7 01 12 23 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Dans un mois",      features: ["Architecture contemporaine signée"],          status: "visite_prevue", score: "warm", source: "ig",     assignedAgentId: 3,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(9, 16, 45), notes: "" },
@@ -4221,7 +4287,7 @@ function renderScoreCell(lead, opts = {}) {
     { v: "none", label: "Non évalué", mod: "none" },
   ];
   const menu = isOpen ? `
-    <div class="score-menu${opts.menuUp ? " score-menu--up" : ""}" role="listbox">
+    <div class="score-menu${opts.menuUp ? " score-menu--up" : ""}${surface === "row" ? " score-menu--end" : ""}" role="listbox">
       ${opts3.map(o => {
         const on = (o.v === lead.score) || (o.v === "none" && !map[lead.score]);
         return `<button class="score-menu-item${on ? " score-menu-item--on" : ""}"
@@ -4263,7 +4329,7 @@ function renderStatusCell(lead, opts = {}) {
   const isOpen = !!open && open.id === lead.id && open.surface === surface;
   const stages = (state.agency.pipeline.buyer || []);
   const menu = isOpen ? `
-    <div class="status-menu${opts.menuUp ? " status-menu--up" : ""}" role="listbox">
+    <div class="status-menu${opts.menuUp ? " status-menu--up" : ""}${surface === "row" ? " status-menu--end" : ""}" role="listbox">
       ${stages.map(s => {
         const sc = stageColors(s.id);
         const on = s.id === lead.status;
@@ -4557,6 +4623,14 @@ function renderBulkActionBar(visibleIds) {
   const hiddenText = hiddenCount > 0
     ? ` · <span class="leads-bulk-bar-hidden">${hiddenCount} masqué${hiddenCount === 1 ? "" : "s"}</span>`
     : "";
+  // v0.16 — Statut/Score open popovers above their button (.status-menu/
+  // .score-menu reused with the --up modifier). Supprimer is destructive →
+  // wired with a native confirm in the handler. Assigner/Archiver dropped:
+  // V1 has no agent model (Agent column removed per V1_SCOPE §2.1), and
+  // archive duplicates Statut "Perdu" (the off-funnel terminal state).
+  // See ADR-0011.
+  const statusOpen = state.bulkMenu === "status";
+  const scoreOpen  = state.bulkMenu === "score";
   return `
     <div class="leads-bulk-bar" role="region" aria-label="Actions groupées">
       <div class="leads-bulk-bar-count">
@@ -4564,14 +4638,62 @@ function renderBulkActionBar(visibleIds) {
         ${countText}${hiddenText}
       </div>
       <div class="leads-bulk-bar-actions">
-        <button class="leads-bulk-btn" data-action="bulk-assign">${icon.userCheck()}<span>Assigner</span></button>
-        <button class="leads-bulk-btn" data-action="bulk-change-status">${icon.target()}<span>Changer le statut</span></button>
-        <button class="leads-bulk-btn" data-action="bulk-archive">${icon.archive()}<span>Archiver</span></button>
+        <div class="bulk-menu-wrap">
+          <button class="leads-bulk-btn" data-action="toggle-bulk-status-menu"
+                  aria-haspopup="listbox" aria-expanded="${statusOpen}">
+            ${icon.target()}<span>Statut</span>${icon.chevronDown()}
+          </button>
+          ${statusOpen ? renderBulkStatusMenu() : ""}
+        </div>
+        <div class="bulk-menu-wrap">
+          <button class="leads-bulk-btn" data-action="toggle-bulk-score-menu"
+                  aria-haspopup="listbox" aria-expanded="${scoreOpen}">
+            <span class="score-chip-dot score-dot--warm" aria-hidden="true"></span><span>Score</span>${icon.chevronDown()}
+          </button>
+          ${scoreOpen ? renderBulkScoreMenu() : ""}
+        </div>
         <button class="leads-bulk-btn leads-bulk-btn--danger" data-action="bulk-delete">${icon.trash()}<span>Supprimer</span></button>
       </div>
       <button class="leads-bulk-bar-clear" data-action="clear-selection" aria-label="Effacer la sélection">${icon.close()}</button>
     </div>
   `;
+}
+
+/* v0.16 — bulk popovers, opened from the bulk action bar's Statut/Score
+   buttons. Re-use .status-menu / .score-menu (same visual language as the
+   per-lead inline dropdowns) with the --up modifier (bar is at the bottom).
+   No "selected" check shown since the action spans multiple leads which may
+   currently sit on different values. */
+function renderBulkStatusMenu() {
+  const stages = state.agency.pipeline.buyer || [];
+  return `
+    <div class="status-menu status-menu--up" role="listbox" aria-label="Changer le statut">
+      ${stages.map(s => {
+        const sc = stageColors(s.id);
+        return `<button class="status-menu-item"
+                        role="option"
+                        data-action="bulk-set-status" data-status="${s.id}">
+          <span class="status-dot" style="background:${sc.fg};"></span>${s.label}
+        </button>`;
+      }).join("")}
+    </div>`;
+}
+
+function renderBulkScoreMenu() {
+  const opts3 = [
+    { v: "hot",  label: "Chaud",      mod: "hot"  },
+    { v: "warm", label: "Tiède",      mod: "warm" },
+    { v: "cold", label: "Froid",      mod: "cold" },
+    { v: "none", label: "Non évalué", mod: "none" },
+  ];
+  return `
+    <div class="score-menu score-menu--up" role="listbox" aria-label="Changer le score">
+      ${opts3.map(o => `<button class="score-menu-item"
+                        role="option"
+                        data-action="bulk-set-score" data-score="${o.v}">
+        <span class="score-chip-dot score-dot--${o.mod}"></span>${o.label}
+      </button>`).join("")}
+    </div>`;
 }
 
 /* v0.15 — Filters panel (Greg brief: filters into V1, BRIEF_STATE §5). A
@@ -5094,6 +5216,11 @@ document.addEventListener("click", (e) => {
     setState({ filterPanelOpen: false });
   }
 
+  // v0.16 — outside-click closes the bulk action popovers
+  if (state.bulkMenu != null && !e.target.closest(".bulk-menu-wrap")) {
+    setState({ bulkMenu: null });
+  }
+
   const target = e.target.closest("[data-action], [data-route]");
   if (!target) return;
 
@@ -5331,20 +5458,49 @@ document.addEventListener("click", (e) => {
       // user can continue picking. Full exit is via the Annuler button / ESC.
       setState({ selectedLeadIds: [] });
       break;
-    case "bulk-assign":
-    case "bulk-change-status":
-    case "bulk-archive":
+    case "toggle-bulk-status-menu":
+      // v0.16 — open/close the Statut popover above the bulk bar. Toggling
+      // off the open popover closes both; switching opens the new one.
+      setState({ bulkMenu: state.bulkMenu === "status" ? null : "status" });
+      break;
+    case "toggle-bulk-score-menu":
+      setState({ bulkMenu: state.bulkMenu === "score" ? null : "score" });
+      break;
+    case "bulk-set-status": {
+      // v0.16 — apply a Statut to every selected lead at once. Mirrors the
+      // single-lead set-status handler (validates against the buyer pipeline,
+      // resets to page 1 since the change may filter the visible set). Closes
+      // the popover; selection persists so a second action can chain.
+      const status = target.getAttribute("data-status");
+      const valid = (state.agency.pipeline.buyer || []).some(s => s.id === status);
+      if (!valid || state.selectedLeadIds.length === 0) break;
+      const ids = new Set(state.selectedLeadIds);
+      state.leads.forEach(l => { if (ids.has(l.id)) l.status = status; });
+      setState({ bulkMenu: null, leadsPage: 1 });
+      break;
+    }
+    case "bulk-set-score": {
+      // v0.16 — apply a Score to every selected lead at once. Same shape as
+      // bulk-set-status; "none" (Non évalué) is a real selectable value, so
+      // batches can be un-qualified back to grey on purpose.
+      const score = target.getAttribute("data-score");
+      if (!SCORE_VALUES.includes(score) || state.selectedLeadIds.length === 0) break;
+      const ids = new Set(state.selectedLeadIds);
+      state.leads.forEach(l => { if (ids.has(l.id)) l.score = score; });
+      setState({ bulkMenu: null, leadsPage: 1 });
+      break;
+    }
     case "bulk-delete": {
-      // Stubs: popovers + confirms ship as a follow-up. Keep the selection
-      // intact so the user can see what would have been acted on.
+      // v0.16 — destructive bulk op: native confirm() guards the action.
+      // Selection clears on success (the leads being acted on no longer
+      // exist); select mode stays on so the user can continue working.
       const n = state.selectedLeadIds.length;
-      const verb = {
-        "bulk-assign":        "Assigner un agent à",
-        "bulk-change-status": "Changer le statut de",
-        "bulk-archive":       "Archiver",
-        "bulk-delete":        "Supprimer",
-      }[action];
-      alert(`${verb} ${n} lead${n === 1 ? "" : "s"} — action à construire.`);
+      if (n === 0) break;
+      const msg = `Supprimer ${n} lead${n === 1 ? "" : "s"} ? Cette action est définitive.`;
+      if (!window.confirm(msg)) break;
+      const ids = new Set(state.selectedLeadIds);
+      const nextLeads = state.leads.filter(l => !ids.has(l.id));
+      setState({ leads: nextLeads, selectedLeadIds: [], bulkMenu: null, leadsPage: 1 });
       break;
     }
     case "toggle-filter-panel": {
@@ -5437,6 +5593,7 @@ document.addEventListener("input", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (state.drawer)              { setState({ drawer: null });             return; }
+  if (state.bulkMenu)            { setState({ bulkMenu: null });           return; }
   if (state.filterPanelOpen)     { setState({ filterPanelOpen: false });   return; }
   if (state.selectionMode)       { setState({ selectionMode: false, selectedLeadIds: [] }); return; }
   if (state.userMenuOpen)        { setState({ userMenuOpen: false });      return; }
