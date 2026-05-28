@@ -1,5 +1,14 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.16.1
+  Bulk action bar moved out of the sticky-bottom location and into the table
+  toolbar next to Filtrer. Same three actions (Statut · Score · Supprimer —
+  ADR-0011 composition unchanged), now discoverable on long mobile pages.
+  Annuler carries the selection count (e.g. "Annuler (2)"); the "X masqués"
+  readout dropped with the bar. Popovers open downward (no --up). Replaces
+  the v0.16.0 sticky-bottom bar that on iOS Safari was effectively hidden
+  below the visible viewport. See CHANGELOG v0.16.1.
+
   Open House Leads — v0.16.0
   Bulk-actions cycle (post-Greg-demo polish) + mobile dropdown fixes. Mobile:
   Score and Statut row/card menus now anchor to the pill's right edge
@@ -1831,9 +1840,9 @@
     border-radius: var(--r-md);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
   }
-  /* v0.13.2 — opens upward; used inside the drawer Qualification rapide
-     section, which sits at the bottom of the scrollable drawer body where a
-     downward menu would clip. */
+  /* v0.13.2 — opens upward; DORMANT since v0.16.1 (nothing sets menuUp:true
+     after the bottom bulk bar was removed). Kept for a future menu near the
+     viewport bottom. */
   .status-menu--up { top: auto; bottom: calc(100% + 4px); }
   /* v0.15.2 — opens leftward from the pill's right edge; used on the
      row/card surface where the Statut pill sits near the right edge of the
@@ -1918,6 +1927,7 @@
   }
   .score-menu-item:hover { background: var(--surface-tint); }
   .score-menu-item--on { font-weight: 600; }
+  /* DORMANT since v0.16.1 — see .status-menu--up note. */
   .score-menu--up { top: auto; bottom: calc(100% + 4px); }
   /* v0.15.2 — mirrors .status-menu--end: row/card surface anchors the menu
      to the pill's right edge so it opens leftward, since the Score pill
@@ -2010,6 +2020,16 @@
   .leads-table-btn--active:hover {
     background: var(--row-hover);
     border-color: var(--text-secondary);
+  }
+  /* v0.16.1 — danger variant for the bulk Supprimer button in the toolbar.
+     Was .leads-bulk-btn--danger when the bulk bar lived at the bottom; the
+     bar was removed and the button moved into the toolbar (ADR-0011 scope
+     unchanged, placement-only). */
+  .leads-table-btn--danger { color: #B91C1C; }
+  .leads-table-btn--danger:hover {
+    background: #FEE2E2;
+    border-color: #F5A5A5;
+    color: #7F1D1D;
   }
   .leads-table-btn-badge {
     display: inline-flex;
@@ -2258,102 +2278,10 @@
     border-color: var(--accent-blue);
   }
 
-  /* Bulk action bar: lives inside the table card at the bottom. When
-     selection > 0, it enters from below. Sticky to the card's bottom edge
-     during scroll — sits visually on top of the last row without a gap. */
-  .leads-bulk-bar {
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 12px 22px;
-    background: var(--panel);
-    border-top: 1px solid var(--border-subtle);
-    box-shadow: 0 -6px 18px -12px rgba(15, 23, 42, 0.18);
-  }
-  .leads-bulk-bar-count {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-primary);
-    letter-spacing: -0.05px;
-  }
-  .leads-bulk-bar-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--accent-blue);
-    flex-shrink: 0;
-  }
-  /* v0.9.1 — hidden-count hint inside the bulk bar. Renders when the
-     selection includes leads outside the current filter/search view. */
-  .leads-bulk-bar-hidden {
-    color: var(--text-muted);
-    font-weight: 400;
-  }
-  .leads-bulk-bar-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 1;
-    flex-wrap: wrap;
-  }
-  .leads-bulk-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 32px;
-    padding: 0 11px;
-    background: var(--panel);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--r-sm);
-    font-family: inherit;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-primary);
-    cursor: pointer;
-    letter-spacing: -0.05px;
-    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
-  }
-  .leads-bulk-btn:hover {
-    background: var(--row-hover);
-    border-color: var(--border-strong);
-  }
-  .leads-bulk-btn svg { width: 13px; height: 13px; stroke-width: 2; }
-  .leads-bulk-btn--danger { color: #B91C1C; }
-  .leads-bulk-btn--danger:hover {
-    background: #FEE2E2;
-    border-color: #F5A5A5;
-    color: #7F1D1D;
-  }
-  .leads-bulk-bar-clear {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: transparent;
-    border: 0;
-    color: var(--text-muted);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: background 120ms ease, color 120ms ease;
-  }
-  .leads-bulk-bar-clear:hover {
-    background: var(--row-hover);
-    color: var(--text-primary);
-  }
-  .leads-bulk-bar-clear svg { width: 16px; height: 16px; stroke-width: 2; }
-  /* v0.16 — wrapper for the Statut/Score popovers above the bulk bar.
+  /* v0.16.1 — wrapper for the bulk Statut/Score popovers in the toolbar.
      Mirrors .status-wrap / .score-wrap (inline-flex + position: relative).
-     The popovers reuse .status-menu / .score-menu with the existing --up
-     modifier (the bulk bar sits at the bottom of the table card, so the
-     menu opens upward). */
+     Popovers reuse .status-menu / .score-menu without the --up modifier
+     since the toolbar sits at the top of the table card (open downward). */
   .bulk-menu-wrap { position: relative; display: inline-flex; }
 
   .leads-col { min-width: 0; }
@@ -2906,16 +2834,6 @@
     .leads .leads-title-mode { font-size: 20px; }
     .leads .leads-title-prefix { font-size: 12px; top: -1px; }
 
-    /* Mobile bulk bar: wrap; drop count-text on tight widths via min-widths */
-    .leads-bulk-bar {
-      padding: 10px 16px;
-      flex-wrap: wrap;
-    }
-    .leads-bulk-bar-actions { gap: 5px; }
-    .leads-bulk-btn { padding: 0 9px; font-size: 11px; }
-    .leads-bulk-btn span { display: none; }  /* icons only on mobile */
-    .leads-bulk-btn { height: 30px; width: 36px; justify-content: center; padding: 0; }
-
     .app-shell { grid-template-columns: 1fr; }
     .sidebar {
       position: fixed;
@@ -3024,7 +2942,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.16.0";
+const APP_VERSION = "v0.16.1";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -3140,9 +3058,10 @@ const state = {
   selectionMode: false,
   selectedLeadIds: [],
   // v0.16 — bulk action popover open-state. null | "status" | "score". Drives
-  // the popovers above the Statut/Score buttons in the bulk action bar; same
-  // family as openStatusMenu/openScoreMenu but bar-scoped (one popover at a
-  // time, no per-lead id since the action applies to all selectedLeadIds).
+  // the Statut/Score popovers in the table toolbar (v0.16.1; were in the
+  // sticky bulk bar at v0.16.0). Same family as openStatusMenu/openScoreMenu
+  // but toolbar-scoped (one popover at a time, no per-lead id since the action
+  // applies to all selectedLeadIds).
   bulkMenu: null,
 
   // Team roster. IDs used by lead.assignedAgentId.
@@ -3531,7 +3450,7 @@ const icon = {
   barChart:    () => svg(`<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>`),
   users:       () => svg(`<path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>`),
   megaphone:   () => svg(`<path d="M3 11v2a4 4 0 004 4h1l5 4V3L8 7H7a4 4 0 00-4 4z"/><path d="M18 8v8"/><path d="M21 10v4"/>`),
-  archive:     () => svg(`<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8"/><path d="M10 12h4"/>`),
+  archive:     () => svg(`<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8"/><path d="M10 12h4"/>`),  /* reserved for V2 (ex-bulk Archiver, ADR-0011) */
   settings:    () => svg(`<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>`),
 
   // Stage-card icons (Step 2 Layer 2)
@@ -3550,7 +3469,7 @@ const icon = {
   arrowDown:   () => svg(`<path d="M19 12l-7 7-7-7"/><path d="M12 5v14"/>`),
   chevronsUpDown: () => svg(`<path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/>`),
   trash:       () => svg(`<path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>`),
-  userCheck:   () => svg(`<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>`),
+  userCheck:   () => svg(`<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>`),  /* reserved for V2 (ex-bulk Assigner, ADR-0011) */
 
   // Source icons (drawer header, future Filter popover). Lucide-style
   // monochrome stroke — keeps the aesthetic consistent with nav + actions
@@ -4319,7 +4238,9 @@ function renderScoreCell(lead, opts = {}) {
    flow). The pill is its own [data-action] so row-click never fires under it. */
 function renderStatusCell(lead, opts = {}) {
   // opts.surface: "row" (table/card, default) | "drawer". opts.menuUp opens the
-  // menu upward (drawer, where it sits at the bottom of a scrollable body).
+  // menu upward — DORMANT since v0.16.1: nothing currently sets menuUp:true (the
+  // drawer passes false; the old bottom bulk bar that needed it was removed).
+  // Kept as a capability for a future menu that sits near the viewport bottom.
   // open-state is keyed by { id, surface } so a lead's row menu and drawer menu
   // are independent — opening one doesn't pop the other (v0.13.2).
   const surface = opts.surface || "row";
@@ -4604,70 +4525,15 @@ function renderLeadCard(lead) {
   `;
 }
 
-/* Bulk action bar: pinned to the bottom of the table card when at least
-   one lead is selected. Slides in from below. Actions are stubs for now
-   (popovers ship as a follow-up), but the selection semantics are live.
-
-   v0.9.1 — accepts visibleIds (the current filter/search view's lead ids)
-   so we can show "X sélectionnés · Y masqués" when some of the selection
-   is currently hidden by the active filter. Prevents the "wait, where did
-   my selection go?" confusion when a user picks leads, then changes the
-   filter, and sees the bar count > visible count. */
-function renderBulkActionBar(visibleIds) {
-  const n = state.selectedLeadIds.length;
-  if (n === 0) return "";
-  const hiddenCount = visibleIds
-    ? state.selectedLeadIds.filter(id => !visibleIds.includes(id)).length
-    : 0;
-  const countText = `${n} sélectionné${n === 1 ? "" : "s"}`;
-  const hiddenText = hiddenCount > 0
-    ? ` · <span class="leads-bulk-bar-hidden">${hiddenCount} masqué${hiddenCount === 1 ? "" : "s"}</span>`
-    : "";
-  // v0.16 — Statut/Score open popovers above their button (.status-menu/
-  // .score-menu reused with the --up modifier). Supprimer is destructive →
-  // wired with a native confirm in the handler. Assigner/Archiver dropped:
-  // V1 has no agent model (Agent column removed per V1_SCOPE §2.1), and
-  // archive duplicates Statut "Perdu" (the off-funnel terminal state).
-  // See ADR-0011.
-  const statusOpen = state.bulkMenu === "status";
-  const scoreOpen  = state.bulkMenu === "score";
-  return `
-    <div class="leads-bulk-bar" role="region" aria-label="Actions groupées">
-      <div class="leads-bulk-bar-count">
-        <span class="leads-bulk-bar-dot" aria-hidden="true"></span>
-        ${countText}${hiddenText}
-      </div>
-      <div class="leads-bulk-bar-actions">
-        <div class="bulk-menu-wrap">
-          <button class="leads-bulk-btn" data-action="toggle-bulk-status-menu"
-                  aria-haspopup="listbox" aria-expanded="${statusOpen}">
-            ${icon.target()}<span>Statut</span>${icon.chevronDown()}
-          </button>
-          ${statusOpen ? renderBulkStatusMenu() : ""}
-        </div>
-        <div class="bulk-menu-wrap">
-          <button class="leads-bulk-btn" data-action="toggle-bulk-score-menu"
-                  aria-haspopup="listbox" aria-expanded="${scoreOpen}">
-            <span class="score-chip-dot score-dot--warm" aria-hidden="true"></span><span>Score</span>${icon.chevronDown()}
-          </button>
-          ${scoreOpen ? renderBulkScoreMenu() : ""}
-        </div>
-        <button class="leads-bulk-btn leads-bulk-btn--danger" data-action="bulk-delete">${icon.trash()}<span>Supprimer</span></button>
-      </div>
-      <button class="leads-bulk-bar-clear" data-action="clear-selection" aria-label="Effacer la sélection">${icon.close()}</button>
-    </div>
-  `;
-}
-
-/* v0.16 — bulk popovers, opened from the bulk action bar's Statut/Score
-   buttons. Re-use .status-menu / .score-menu (same visual language as the
-   per-lead inline dropdowns) with the --up modifier (bar is at the bottom).
-   No "selected" check shown since the action spans multiple leads which may
-   currently sit on different values. */
+/* v0.16.1 — bulk popovers, opened from the toolbar's Statut/Score buttons.
+   Re-use .status-menu / .score-menu (same visual language as the per-lead
+   inline dropdowns); popovers open downward (default) since the toolbar
+   sits at the top of the table card. No "selected" check shown since the
+   action spans multiple leads which may currently sit on different values. */
 function renderBulkStatusMenu() {
   const stages = state.agency.pipeline.buyer || [];
   return `
-    <div class="status-menu status-menu--up" role="listbox" aria-label="Changer le statut">
+    <div class="status-menu" role="listbox" aria-label="Changer le statut">
       ${stages.map(s => {
         const sc = stageColors(s.id);
         return `<button class="status-menu-item"
@@ -4687,7 +4553,7 @@ function renderBulkScoreMenu() {
     { v: "none", label: "Non évalué", mod: "none" },
   ];
   return `
-    <div class="score-menu score-menu--up" role="listbox" aria-label="Changer le score">
+    <div class="score-menu" role="listbox" aria-label="Changer le score">
       ${opts3.map(o => `<button class="score-menu-item"
                         role="option"
                         data-action="bulk-set-score" data-score="${o.v}">
@@ -4784,12 +4650,12 @@ function renderPagination(page, totalPages, totalVisible, pageStart, pageCount) 
     </div>`;
 }
 
-/* Leads table card: contained Prodex-style card. Header is now minimal —
-   just the title "Liste des leads" (no icon, no meta line), search, and
-   the two action buttons (Sélectionner / Annuler, then Filtrer). When in
-   select mode, the leftmost column becomes a checkbox column — header
-   gets a "select all visible" checkbox, rows get per-row checkboxes.
-   When selection > 0, a bulk action bar renders at the bottom of the card. */
+/* Leads table card: contained Prodex-style card. Header carries the title
+   "Liste des leads", search, the select toggle (Sélectionner / Annuler with
+   selection count), Filtrer, and — when in select mode with ≥1 lead picked —
+   the bulk action buttons (Statut · Score · Supprimer). Bulk popovers open
+   downward from the toolbar (no --up). Sticky-bottom bulk bar removed in
+   v0.16.1; the toolbar surface is more discoverable on mobile. */
 function renderLeadsTable(view) {
   const totalVisible     = view.visible.length;
   const visibleIds       = view.visible.map(l => l.id);
@@ -4804,10 +4670,41 @@ function renderLeadsTable(view) {
     : "";
   // "Select all visible" is on when every visible id is already picked.
   const allVisiblePicked = totalVisible > 0 && visibleIds.every(id => state.selectedLeadIds.includes(id));
-  const selectBtnLabel   = state.selectionMode ? "Annuler" : "Sélectionner";
+  // v0.16.1 — Annuler carries the selection count when ≥1 lead is picked.
+  // The count is logically tied to the exit-selection control; no separate
+  // count chip required after the bottom bar was removed.
+  const nSelected        = state.selectedLeadIds.length;
+  const selectBtnLabel   = state.selectionMode
+    ? (nSelected > 0 ? `Annuler (${nSelected})` : "Annuler")
+    : "Sélectionner";
   const selectBtnClass   = state.selectionMode
     ? "leads-table-btn leads-table-btn--active"
     : "leads-table-btn";
+  // v0.16.1 — bulk action buttons inline in the toolbar when in select mode
+  // with ≥1 selection. Replaces the v0.16.0 sticky-bottom bar (was hard to
+  // find on long mobile pages). Popovers open downward (default).
+  const showBulk = state.selectionMode && nSelected > 0;
+  const statusOpen = state.bulkMenu === "status";
+  const scoreOpen  = state.bulkMenu === "score";
+  const bulkButtons = showBulk ? `
+    <div class="bulk-menu-wrap">
+      <button class="leads-table-btn" data-action="toggle-bulk-status-menu"
+              aria-haspopup="listbox" aria-expanded="${statusOpen}">
+        ${icon.target()}<span>Statut</span>${icon.chevronDown()}
+      </button>
+      ${statusOpen ? renderBulkStatusMenu() : ""}
+    </div>
+    <div class="bulk-menu-wrap">
+      <button class="leads-table-btn" data-action="toggle-bulk-score-menu"
+              aria-haspopup="listbox" aria-expanded="${scoreOpen}">
+        <span class="score-chip-dot score-dot--warm" aria-hidden="true"></span><span>Score</span>${icon.chevronDown()}
+      </button>
+      ${scoreOpen ? renderBulkScoreMenu() : ""}
+    </div>
+    <button class="leads-table-btn leads-table-btn--danger" data-action="bulk-delete">
+      ${icon.trash()}<span>Supprimer</span>
+    </button>
+  ` : "";
 
   // v0.15 — pagination. Slice the (already filtered/sorted) view into pages of
   // PAGE_SIZE. Clamp the page so a filter that shrinks the set never strands
@@ -4869,10 +4766,10 @@ function renderLeadsTable(view) {
             </button>
             ${state.filterPanelOpen ? renderFilterPanel() : ""}
           </div>
+          ${bulkButtons}
         </div>
       </div>
       ${body}
-      ${renderBulkActionBar(visibleIds)}
     </div>
   `;
 }
@@ -5431,10 +5328,11 @@ document.addEventListener("click", (e) => {
       // V1: Vendeurs half is disabled. Inert by design — no state change.
       break;
     case "toggle-select-mode": {
-      // Entering: turn the checkbox column on. Leaving: also clear selection —
-      // matches the mental model that "Annuler" means "cancel this operation".
+      // Entering: turn the checkbox column on. Leaving: also clear selection
+      // and any open bulk popover — matches the mental model that "Annuler"
+      // means "cancel this operation".
       if (state.selectionMode) {
-        setState({ selectionMode: false, selectedLeadIds: [] });
+        setState({ selectionMode: false, selectedLeadIds: [], bulkMenu: null });
       } else {
         setState({ selectionMode: true });
       }
@@ -5453,14 +5351,9 @@ document.addEventListener("click", (e) => {
       setState({ selectedLeadIds: nextIds });
       break;
     }
-    case "clear-selection":
-      // X on the bulk bar. Clears selection but stays in select mode —
-      // user can continue picking. Full exit is via the Annuler button / ESC.
-      setState({ selectedLeadIds: [] });
-      break;
     case "toggle-bulk-status-menu":
-      // v0.16 — open/close the Statut popover above the bulk bar. Toggling
-      // off the open popover closes both; switching opens the new one.
+      // v0.16 — open/close the Statut popover in the toolbar. Toggling off
+      // the open popover closes both; switching opens the new one.
       setState({ bulkMenu: state.bulkMenu === "status" ? null : "status" });
       break;
     case "toggle-bulk-score-menu":
