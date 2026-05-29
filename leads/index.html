@@ -1,5 +1,13 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.3
+  Shell trim, cont. (cosmetic, no logic or stack change). Removed the
+  "Liste des leads" table-header title — the card is self-evidently the lead
+  list and the topbar already says Leads, so the title stated the obvious. The
+  header now right-aligns its actions row (search · Sélectionner · Filtrer ·
+  bulk); orphaned title CSS + the stale mobile rule removed. See CHANGELOG
+  v0.18.3.
+
   Open House Leads — v0.18.2
   Shell trim (cosmetic / honesty pass, no logic or stack change). Removed the
   duplicate "Tableau de bord" h1 (the topbar page-title already names the page).
@@ -2014,20 +2022,10 @@
     padding: 16px 22px;
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 14px;
     border-bottom: 1px solid var(--border-subtle);
     flex-wrap: wrap;
-  }
-  .leads-table-header-title {
-    flex: 1;
-    min-width: 0;
-  }
-  .leads-table-title {
-    display: block;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-primary);
-    letter-spacing: -0.15px;
   }
   .leads-table-header-actions {
     display: flex;
@@ -3031,7 +3029,6 @@
     .stage-card-count { font-size: 22px; }
 
     .leads-table-header { padding: 14px 16px; }
-    .leads-table-header-title { flex: 1 1 100%; }
     .leads-table-header-actions {
       flex: 1 1 100%;
       justify-content: flex-start;
@@ -3168,7 +3165,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.2";
+const APP_VERSION = "v0.18.3";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -4942,12 +4939,14 @@ function renderPagination(page, totalPages, totalVisible, pageStart, pageCount) 
     </div>`;
 }
 
-/* Leads table card: contained Prodex-style card. Header carries the title
-   "Liste des leads", search, the select toggle (Sélectionner / Annuler with
-   selection count), Filtrer, and — when in select mode with ≥1 lead picked —
-   the bulk action buttons (Statut · Score · Supprimer). Bulk popovers open
-   downward from the toolbar (no --up). Sticky-bottom bulk bar removed in
-   v0.16.1; the toolbar surface is more discoverable on mobile. */
+/* Leads table card: contained Prodex-style card. Header carries search, the
+   select toggle (Sélectionner / Annuler with selection count), Filtrer, and —
+   when in select mode with ≥1 lead picked — the bulk action buttons (Statut ·
+   Score · Supprimer). The "Liste des leads" header title was dropped in
+   v0.18.2 (the card is self-evidently the list; topbar already says Leads), so
+   the header right-aligns its actions row. Bulk popovers open downward from the
+   toolbar (no --up). Sticky-bottom bulk bar removed in v0.16.1; the toolbar
+   surface is more discoverable on mobile. */
 function renderLeadsTable(view) {
   const totalVisible     = view.visible.length;
   const visibleIds       = view.visible.map(l => l.id);
@@ -5044,9 +5043,6 @@ function renderLeadsTable(view) {
   return `
     <div class="leads-table-card">
       <div class="leads-table-header">
-        <div class="leads-table-header-title">
-          <span class="leads-table-title">Liste des leads</span>
-        </div>
         <div class="leads-table-header-actions">
           ${renderLeadsSearch()}
           <button class="${selectBtnClass}" data-action="toggle-select-mode">
