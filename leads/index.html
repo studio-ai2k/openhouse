@@ -1,5 +1,40 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.0
+  Tableau de bord built into the app. Ported the locked design-review mockup
+  (prototype/dashboard_mockup.html) into live code: renderDashboard() fires on
+  route "dashboard" (nav item activated), computeDashboardView(periode, campagne)
+  aggregates the buyer seed per bloc. Five blocs per ADR-0012 — Vue globale
+  (adaptive: 2 rolling KPI cards by default, single "sur la période" card when a
+  specific Période is set, velocity deltas vs the equivalent previous window) →
+  À traiter en priorité (2 tiles, ADR-0013) → Scores + Statuts pair (Perdu below
+  a dashed split) → Réponses Meta Ads (Paris map hero painted by zone lead-count
+  over a universal-bar fallback + Budgets / Timing / Caractéristiques fact
+  groups). Horizontal-bar visual family throughout; semantic colour reserved for
+  qualification (scores/statuts), neutral accent-blue for the factual Bloc 4.
+  Page-level Période + Campagne filters scope every bloc.
+  Vue rapide chip pattern (ADR-0014) ships alongside: the À traiter tiles push a
+  dismissible chip above the Leads table carrying constraints richer than the
+  Filters panel (contactPreference / age threshold / campaign); the chip is the
+  filter, composes with the panel, and the dashboard Campagne rides along as a
+  second chip. URL transport (?view=…) deferred with the build (no router in
+  Phase 1; deployed bundle frozen — see PARKED). Aging threshold hardcoded to
+  AGING_THRESHOLD_DAYS (Greg-confirmed; brainstorm guess was 3d). No data-model
+  change. Pre-dashboard snapshot kept at backups/leads-index.v0.16.1.html and the
+  mockup kept as the design-review artifact. See CHANGELOG v0.18.0.
+
+  Open House Leads — v0.17.0
+  Tableau de bord brainstorm logged. The dashboard itself is not built into
+  this file yet — the artifact is `prototype/dashboard_mockup.html` (design-
+  review for Greg). App code is unchanged from v0.16.1 apart from this comment
+  and APP_VERSION. ADRs 0012 / 0013 / 0014 capture the brainstorm decisions:
+  composition + visual family (5 blocs, horizontal-bar family, Bloc 1 adaptive,
+  Paris map as enhancement over a universal-bar fallback), Réactivité bloc V1
+  lean composition (2 honest tiles; contacted_at + time-to-contact dropped),
+  and the Vue rapide chip pattern for dashboard → Leads filter handoff. A
+  pre-dashboard snapshot of this file is preserved at
+  `backups/leads-index.v0.16.1.html`. See CHANGELOG v0.17.0.
+
   Open House Leads — v0.16.1
   Bulk action bar moved out of the sticky-bottom location and into the table
   toolbar next to Filtrer. Same three actions (Statut · Score · Supprimer —
@@ -2762,12 +2797,187 @@
     color: var(--text-muted);
   }
   /* ═══════════════════════════════════════════════════════════════
-     RESPONSIVE (placed last so these override all base rules
-     regardless of the order base rules appear above)
+     TABLEAU DE BORD (v0.18 — ADRs 0012/0013/0014)
+     Ported from prototype/dashboard_mockup.html, mapped onto the app's
+     existing :root tokens. Horizontal-bar visual family; semantic colour
+     for qualification (scores/statuts), neutral accent-blue for the factual
+     Bloc 4. The bloc card reuses the app surface (--panel + --border-subtle
+     + --shadow-sm + --r-lg). Dashboard-local responsive rules live at the
+     end of this block so they stay co-located with the component.
      ═══════════════════════════════════════════════════════════════ */
-  @media (max-width: 1024px) {
-    :root { --sidebar-w: 208px; }
-    .topbar { padding: 0 24px; }
+  .dashboard { display: flex; flex-direction: column; }
+  .dash-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 18px; flex-wrap: wrap; margin-bottom: 22px;
+  }
+  .dash-head-title h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary);
+  }
+  .dash-sub { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+  .dash-filters { display: flex; align-items: center; gap: 18px; }
+  .dash-filter { display: flex; align-items: center; gap: 9px; }
+  .dash-filter label {
+    font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .dash-filter select {
+    font-family: var(--font-sans); font-size: 14px; font-weight: 500; color: var(--text-primary);
+    background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+    padding: 9px 34px 9px 13px; cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236E6B64' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+  }
+  .dash-filter select:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 1px; }
+
+  .dash-content { display: flex; flex-direction: column; gap: 18px; max-width: 1180px; }
+  .dash-block {
+    background: var(--panel); border: 1px solid var(--border-subtle);
+    border-radius: var(--r-lg); box-shadow: var(--shadow-sm); padding: 22px 24px;
+  }
+  .dash-block-title {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-secondary); margin-bottom: 18px;
+    display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  }
+  .dash-hint {
+    font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-muted);
+  }
+
+  /* Bloc 1 — KPI cards */
+  .dash-kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .dash-kpi-row--single { grid-template-columns: 1fr; }
+  .dash-kpi {
+    background: var(--surface-tint); border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md); padding: 18px 20px;
+  }
+  .dash-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .dash-kpi-n {
+    font-family: var(--font-mono); font-size: 40px; font-weight: 600;
+    letter-spacing: -0.03em; line-height: 1; color: var(--text-primary);
+  }
+  .dash-kpi-l { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .dash-kpi-w { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+  .dash-delta {
+    display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono);
+    font-size: 12.5px; font-weight: 600; padding: 4px 9px; border-radius: var(--r-pill);
+    white-space: nowrap; flex-shrink: 0; line-height: 1;
+  }
+  .dash-delta svg { width: 11px; height: 11px; flex-shrink: 0; }
+  .dash-delta--up   { background: #E4F4E9; color: #1F7D54; }
+  .dash-delta--down { background: #FDE7E7; color: #A32D2D; }
+  .dash-delta--flat { background: var(--surface-tint); color: var(--text-secondary); }
+
+  /* À traiter en priorité */
+  .dash-priorities { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .dash-priority {
+    display: flex; align-items: flex-start; gap: 12px; padding: 16px 18px; text-align: left;
+    background: var(--panel); border: 1px solid var(--border-subtle); border-radius: var(--r-md);
+    cursor: pointer; position: relative; font-family: var(--font-sans); width: 100%;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  }
+  .dash-priority:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .dash-priority:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 2px; }
+  .dash-priority-mark { width: 9px; height: 9px; border-radius: 50%; margin-top: 13px; flex-shrink: 0; }
+  .dash-priority-body { flex: 1; min-width: 0; display: block; }
+  .dash-priority-count {
+    display: block; font-family: var(--font-mono); font-size: 30px; font-weight: 600;
+    line-height: 1; letter-spacing: -0.02em;
+  }
+  .dash-priority-label { display: block; font-size: 13.5px; font-weight: 600; margin-top: 8px; color: var(--text-primary); }
+  .dash-priority-sub { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.45; }
+  .dash-priority-arrow {
+    position: absolute; top: 16px; right: 16px; opacity: 0.35; color: var(--text-muted);
+    transition: opacity 0.15s, transform 0.15s;
+  }
+  .dash-priority:hover .dash-priority-arrow { opacity: 1; transform: translateX(2px); }
+  .dash-priority-arrow svg { width: 14px; height: 14px; }
+  .dash-priority--urgent .dash-priority-mark  { background: #F5B94C; }
+  .dash-priority--urgent .dash-priority-count { color: #8C5A08; }
+  .dash-priority--aging  .dash-priority-mark  { background: #8A8780; }
+  .dash-priority--aging  .dash-priority-count { color: #4A4843; }
+
+  /* Scores + Statuts pair */
+  .dash-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+  /* Bar rows (the shared visual family) */
+  .dash-bars { display: flex; flex-direction: column; gap: 11px; }
+  .dash-bar-row { display: grid; grid-template-columns: 128px 1fr 34px; align-items: center; gap: 12px; }
+  .dash-bar-label { font-size: 13.5px; font-weight: 500; color: var(--text-body); display: flex; align-items: center; gap: 8px; }
+  .dash-bar-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .dash-bar-track { height: 11px; background: var(--surface-tint); border-radius: var(--r-pill); overflow: hidden; }
+  .dash-bar-fill { display: block; height: 100%; border-radius: var(--r-pill); }
+  .dash-bar-val { font-family: var(--font-mono); font-size: 14px; font-weight: 600; text-align: right; color: var(--text-primary); }
+  .dash-terminal-split { border-top: 1px dashed var(--border-divider); margin-top: 14px; padding-top: 12px; }
+  .dash-bar-row--muted .dash-bar-label, .dash-bar-row--muted .dash-bar-val { color: var(--text-muted); font-size: 12.5px; }
+
+  /* Bloc 4 — Réponses Meta Ads */
+  .dash-sect { display: grid; grid-template-columns: 340px 1fr; gap: 30px; align-items: center; }
+  .dash-sect--no-paris { display: block; }
+  .dash-map-wrap { text-align: center; }
+  .dash-map-svg { width: 100%; max-width: 330px; height: auto; }
+  .dash-map-cap { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .dash-map-legend { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; align-items: flex-start; }
+  .dash-leg { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--text-secondary); }
+  .dash-sw { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.06); }
+  .dash-b4-divider { border: 0; border-top: 1px solid var(--border-divider); margin: 24px 0; }
+  .dash-fact-h {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-secondary); margin-bottom: 16px;
+  }
+  .dash-fact-multi {
+    display: block; font-size: 10.5px; font-weight: 500; text-transform: none;
+    letter-spacing: 0; color: var(--text-muted); margin-top: 3px;
+  }
+  .dash-bars--wide { max-width: 520px; }
+  .dash-sect-bars { min-width: 0; }
+  .dash-fact-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+  .dash-fact-col { min-width: 0; }
+  .dash-fact-bars { display: flex; flex-direction: column; }
+  .dash-fact-row { display: grid; grid-template-columns: 1fr 30px; gap: 8px; margin-bottom: 13px; }
+  .dash-fact-label { grid-column: 1; grid-row: 1; font-size: 12.5px; font-weight: 500; color: var(--text-body); }
+  .dash-fact-val { grid-column: 2; grid-row: 1; font-family: var(--font-mono); font-size: 14px; font-weight: 600; text-align: right; color: var(--text-primary); }
+  .dash-fact-track { grid-column: 1 / -1; grid-row: 2; margin-top: 5px; height: 11px; background: var(--surface-tint); border-radius: var(--r-pill); overflow: hidden; }
+  .dash-fact-fill { display: block; height: 100%; border-radius: var(--r-pill); background: var(--accent-blue); }
+
+  /* Vue rapide chips (Leads page, ADR-0014) */
+  .vue-rapide-row { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
+  .vue-rapide-chip {
+    display: inline-flex; align-items: center; gap: 9px; padding: 6px 8px 6px 12px;
+    background: var(--blue-soft); border: 1px solid #C9D2FF; border-radius: var(--r-pill);
+    font-size: 13px; color: var(--text-primary);
+  }
+  .vue-rapide-chip-tag {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--accent-blue);
+  }
+  .vue-rapide-chip-label { font-weight: 500; }
+  .vue-rapide-chip-x {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; border: 0; cursor: pointer;
+    background: transparent; color: var(--text-secondary); padding: 0;
+    transition: background 0.12s, color 0.12s;
+  }
+  .vue-rapide-chip-x:hover { background: rgba(91,109,255,0.14); color: var(--accent-blue); }
+  .vue-rapide-chip-x svg { width: 13px; height: 13px; }
+
+  @media (max-width: 980px) {
+    .dash-sect { grid-template-columns: 1fr; gap: 20px; }
+    .dash-map-svg { max-width: 300px; }
+    .dash-map-legend { flex-direction: row; flex-wrap: wrap; }
+    .dash-fact-cols { grid-template-columns: 1fr; gap: 22px; }
+  }
+  @media (max-width: 768px) {
+    .dash-head { flex-direction: column; align-items: stretch; gap: 14px; }
+    .dash-filters { flex-direction: column; align-items: stretch; gap: 14px; width: 100%; }
+    .dash-filter { width: 100%; flex-direction: column; align-items: stretch; gap: 6px; }
+    .dash-filter select { width: 100%; }
+    .dash-pair { grid-template-columns: 1fr; }
+    .dash-kpi-row { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .dash-priorities { grid-template-columns: 1fr; gap: 10px; }
+    .dash-bar-row { grid-template-columns: 108px 1fr 30px; }
+  }
+
+
     .content { padding: 0 24px 24px; }
     .search { width: 240px; }
 
@@ -2942,7 +3152,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.16.1";
+const APP_VERSION = "v0.18.0";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -2965,6 +3175,13 @@ const SCORE_VALUES = ["none", "hot", "warm", "cold"];
 // operate on the same "current view".
 const PAGE_SIZE = 20;
 const TIMING_ORDER = { "Immédiatement": 3, "Dans les 6 prochains mois": 2, "Plus de 6 mois": 1 };
+// v0.18 — Réactivité bloc aging threshold (ADR-0013). A lead still in Nouveau
+// older than this many days is flagged "En Nouveau depuis +Nj". Greg-confirmed
+// value goes here; Claude's brainstorm guess was 3d (real-estate first-contact
+// practice is usually <24h, ideal 2-4h, so Magrey may want 24h/48h). Per-tenant
+// configurable in Phase 2; one hardcoded value for V1. Drives both the tile
+// count and the matching Vue rapide chip so the dashboard→Leads handoff is exact.
+const AGING_THRESHOLD_DAYS = 3;
 /* Terse Timing labels for the dense desktop scan column (data value is kept
    full per Greg's form wording; only the display is shortened). */
 const TIMING_SHORT = { "Immédiatement": "Immédiat", "Dans les 6 prochains mois": "Sous 6 mois", "Plus de 6 mois": "6 mois +" };
@@ -3021,6 +3238,32 @@ const state = {
 
   // nav — active route
   route: "leads",  // "leads" | "dashboard" | "agents" | "campaigns" | "database" | "settings" | "help"
+
+  // v0.18 — Tableau de bord page-level filters (ADR-0012). Both scope every
+  // bloc. periode presets match the Leads Filters panel exactly so the date
+  // vocabulary is one across the app. campagne is a dashboard-only dimension
+  // (not surfaced in the Leads Filters panel — it travels to Leads as a Vue
+  // rapide chip instead, ADR-0014). null campagne = all campaigns.
+  //   dashPeriode ∈ null | "today" | "7d" | "30d" | "month"  (null = Toutes les dates)
+  //   dashCampagne ∈ null | <campaign string> | "__demo_non_paris__"
+  dashPeriode: null,
+  dashCampagne: null,
+
+  // v0.18 — Vue rapide chips (ADR-0014). The Leads page accepts filter state
+  // richer than the Filters panel can express (contactPreference, age
+  // threshold, campaign). Dashboard tiles + campaign carry-over push a chip
+  // here; it renders above the table, composes with the panel, and is
+  // dismissible. Each entry: { kind, label, ...constraint }.
+  //   kind "demandes-immediates" → contactPreference="Tout de suite" AND status=nouveau
+  //   kind "aging-nouveau"       → status=nouveau AND age(createdAt) > AGING_THRESHOLD_DAYS
+  //   kind "campagne"            → campaign === value
+  // At most one of each kind (a new push of the same kind replaces it).
+  // URL transport (?view=…&campagne=…) is deferred with the build — the app
+  // has no router in Phase 1 and the deployed bundle is frozen, so deep-links
+  // are inert until the Pages redeploy. The chip *behaviour* (the ADR-0014
+  // contract) ships now via in-memory state; the URL is the transport layer
+  // that lands when routing does. See PARKED.
+  vueRapide: [],
 
   // chrome state
   sidebarOpen: false,        // mobile only
@@ -3196,6 +3439,31 @@ const state = {
 function setState(patch) {
   Object.assign(state, patch);
   render();
+}
+
+/* v0.18 — push a Vue rapide chip and navigate to the Leads page (ADR-0014).
+   Carries the dashboard's current Campagne as a second chip so dashboard scope
+   travels with the tile click. Replaces any existing chip of the same kind
+   (at most one of each). Resets the panel-native dims (filterTab / Score / Date)
+   so the landing set is exactly the chip's subset — the user composes panel
+   constraints on top from there. */
+function applyVueRapide(chip) {
+  const chips = state.vueRapide.filter(v => v.kind !== chip.kind && v.kind !== "campagne");
+  chips.push(chip);
+  // Carry the dashboard Campagne over (unless it's the demo / "all").
+  if (state.dashCampagne && state.dashCampagne !== "__demo_non_paris__") {
+    chips.push({ kind: "campagne", label: `Campagne : ${state.dashCampagne}`, value: state.dashCampagne });
+  }
+  setState({
+    route: "leads",
+    leadType: "buyer",
+    filterTab: "all",
+    filters: { score: [], date: null },
+    leadsSearch: "",
+    vueRapide: chips,
+    leadsPage: 1,
+    drawer: null,
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3902,16 +4170,32 @@ function computeLeadsView() {
     return true;
   });
 
+  // v0.18 — Vue rapide chips (ADR-0014). Constraints richer than the Filters
+  // panel can express, layered on as an intersection on top of the panel-
+  // driven set. Each active chip narrows further; multiple chips compose.
+  const vrConstrained = (state.vueRapide || []).reduce((set, chip) => {
+    if (chip.kind === "demandes-immediates") {
+      return set.filter(l => l.contactPreference === "Tout de suite" && l.status === "nouveau");
+    }
+    if (chip.kind === "aging-nouveau") {
+      return set.filter(l => l.status === "nouveau" && leadAgeDays(l) > AGING_THRESHOLD_DAYS);
+    }
+    if (chip.kind === "campagne") {
+      return set.filter(l => l.campaign === chip.value);
+    }
+    return set;
+  }, refined);
+
   // Apply column sort. null = default order (by state.leads insertion = by id).
   // Sort happens LAST so filter + search don't depend on sort direction.
   if (state.leadsSort) {
     const cmp = leadComparator(state.leadsSort.column);
     const factor = state.leadsSort.direction === "asc" ? 1 : -1;
-    refined.sort((a, b) => cmp(a, b) * factor);
+    vrConstrained.sort((a, b) => cmp(a, b) * factor);
   }
 
   return {
-    visible: refined,
+    visible: vrConstrained,
     pipeline,
     type,
     search,
@@ -4793,9 +5077,26 @@ function renderLeadsContent() {
         ${renderLeadsContextChip(state.leadType, typeCount)}
         <span class="leads-updated-meta">Mis à jour il y a 2 min</span>
       </div>
+      ${renderVueRapideChips()}
       ${renderLeadsTable(view)}
     </div>
   `;
+}
+
+/* v0.18 — Vue rapide chips (ADR-0014). Dismissible chips above the table that
+   carry filter state richer than the Filters panel can express
+   (contactPreference, age threshold, campaign). The chip IS the filter;
+   closing it drops back to a panel-driven view. Chips compose with the panel
+   (intersection) and with each other. */
+function renderVueRapideChips() {
+  if (!state.vueRapide.length) return "";
+  const chips = state.vueRapide.map(v => `
+    <span class="vue-rapide-chip">
+      <span class="vue-rapide-chip-tag">Vue rapide</span>
+      <span class="vue-rapide-chip-label">${v.label}</span>
+      <button class="vue-rapide-chip-x" data-action="clear-vue-rapide" data-vr-kind="${v.kind}" aria-label="Retirer ce filtre">${icon.close()}</button>
+    </span>`).join("");
+  return `<div class="vue-rapide-row">${chips}</div>`;
 }
 
 function renderContent() {
@@ -4806,8 +5107,540 @@ function renderContent() {
   `;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   TABLEAU DE BORD (v0.18 — ADRs 0012 / 0013 / 0014)
+   Built from the locked design-review mockup
+   (prototype/dashboard_mockup.html). Five blocs, horizontal-bar visual
+   family, semantic-vs-factual colour discipline. Computes entirely from
+   the existing buyer seed — no backend, no data-model change.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* The three known Meta secteur zones (V1_SCOPE §4). Bloc 4 paints the Paris
+   map when every present secteur is one of these; otherwise the map collapses
+   to a bar-only "Autres secteurs" block (ADR-0012). For Magrey V1 every buyer
+   secteur is one of the three, so the map is always-on — the fallback earns
+   its keep at second-agency time (Phase 2). */
+/* Inlined from prototype/paris_arrondissements.svg (viewBox 500×400, stable
+   ids arr-1..arr-20). The map paths + the Seine overlay. Painted at render
+   time by renderParisMap; geometry is static. */
+const PARIS_ARR_PATHS = [
+  { n: 1, d: "M292.74,205.10 L274.66,199.18 L268.08,198.52 L252.63,192.93 L224.68,180.11 L222.87,177.97 L227.48,169.75 L230.76,157.26 L240.46,152.82 L241.29,156.93 L246.22,162.85 L256.25,168.93 L269.40,173.53 L278.93,175.18 L300.96,183.40 L292.74,205.10 Z" },
+  { n: 2, d: "M301.95,179.12 L279.92,170.90 L274.00,170.24 L260.52,166.30 L250.99,161.37 L246.55,156.93 L244.57,151.99 L271.70,144.27 L277.95,145.25 L288.47,149.53 L294.39,150.19 L302.94,153.80 L310.50,154.79 L312.31,157.58 L306.39,167.78 L306.06,171.72 L301.95,179.12 Z" },
+  { n: 3, d: "M352.26,210.69 L334.50,204.44 L322.34,193.59 L316.75,190.30 L304.42,187.18 L306.39,180.27 L310.01,173.70 L310.66,169.09 L316.75,156.76 L336.48,163.01 L341.08,165.31 L343.54,168.11 L346.83,182.24 L349.13,187.18 L352.26,210.69 Z" },
+  { n: 4, d: "M344.70,249.16 L336.64,241.43 L335.00,230.91 L332.86,227.78 L313.46,217.26 L307.87,212.66 L296.85,206.58 L302.61,191.29 L315.76,194.57 L333.52,208.71 L353.08,215.78 L355.05,224.99 L352.75,225.98 L344.70,249.16 Z M307.21,228.44 L288.47,217.92 L283.87,216.93 L278.77,207.56 L291.10,210.03 L304.25,217.59 L307.05,220.06 L308.03,227.62 L307.21,228.44 Z" },
+  { n: 5, d: "M300.31,292.56 L291.76,290.26 L287.15,286.97 L274.00,285.00 L267.26,280.56 L272.52,262.80 L276.47,256.23 L277.78,248.99 L280.74,244.39 L283.04,237.15 L286.66,231.89 L288.14,226.80 L295.38,231.40 L322.99,242.25 L329.57,247.18 L342.89,260.83 L336.97,273.65 L332.20,280.72 L309.18,291.24 L300.31,292.56 Z" },
+  { n: 6, d: "M262.17,279.74 L258.88,279.08 L237.51,266.58 L227.97,263.95 L211.04,251.62 L240.30,231.57 L242.60,226.63 L242.60,219.40 L245.23,203.29 L246.71,200.16 L256.58,203.12 L266.77,208.38 L272.85,213.81 L275.98,218.25 L284.03,224.33 L283.04,229.59 L277.46,238.47 L276.80,242.42 L273.18,249.65 L272.52,254.91 L269.24,259.51 L264.30,276.61 L262.17,279.74 Z" },
+  { n: 7, d: "M198.05,249.81 L195.42,249.81 L187.53,244.88 L184.90,244.88 L179.96,247.18 L173.72,242.91 L165.17,233.37 L141.49,212.00 L134.10,203.29 L149.06,188.00 L163.20,183.72 L210.21,183.40 L224.68,188.99 L241.12,197.53 L242.27,199.67 L237.34,228.28 L211.53,246.20 L198.05,249.81 Z" },
+  { n: 8, d: "M217.78,176.82 L215.15,174.85 L211.86,174.52 L166.81,175.18 L163.20,173.86 L160.40,170.08 L156.46,150.68 L150.87,138.51 L147.25,133.91 L153.17,119.77 L160.24,115.00 L165.17,114.68 L192.13,106.13 L222.71,100.54 L233.23,95.93 L234.05,96.76 L234.38,108.92 L233.07,113.20 L233.72,118.79 L232.41,123.72 L232.74,149.36 L231.26,152.16 L228.13,153.31 L222.87,169.75 L220.24,175.01 L217.78,176.82 Z" },
+  { n: 9, d: "M239.15,149.20 L236.68,148.05 L236.35,141.80 L236.68,124.38 L238.00,120.10 L237.34,113.85 L238.66,110.89 L238.00,95.77 L239.81,93.63 L245.07,91.66 L249.01,93.96 L257.89,96.59 L261.51,96.59 L272.69,101.19 L292.09,95.28 L300.64,93.96 L302.44,94.78 L301.79,103.00 L299.16,105.63 L298.83,113.85 L296.20,119.77 L293.57,143.45 L292.42,145.58 L290.44,145.91 L280.58,141.64 L271.70,139.99 L239.15,149.20 Z" },
+  { n: 10, d: "M344.04,160.05 L339.11,160.05 L332.86,156.76 L304.25,149.53 L297.18,146.73 L300.14,121.09 L303.10,114.18 L303.43,108.92 L306.06,103.66 L307.21,92.32 L324.64,91.99 L341.41,89.69 L351.93,91.33 L357.68,96.43 L358.34,114.51 L359.66,118.13 L368.86,132.27 L372.81,135.88 L378.07,143.77 L369.68,146.90 L366.40,149.53 L344.04,160.05 Z" },
+  { n: 11, d: "M439.72,243.24 L418.68,239.95 L410.46,237.32 L399.93,237.32 L393.69,235.02 L385.47,234.36 L372.32,230.74 L360.15,224.50 L357.68,219.07 L353.74,188.49 L351.11,181.59 L349.13,170.74 L345.85,164.16 L371.99,150.84 L381.52,147.56 L383.66,152.32 L389.25,157.26 L398.13,171.39 L406.02,179.94 L414.24,200.99 L431.01,214.80 L436.60,228.93 L439.88,233.87 L440.54,239.79 L439.72,243.24 Z" },
+  { n: 12, d: "M424.27,341.55 L422.95,341.55 L415.55,335.80 L411.28,329.22 L387.93,301.93 L367.55,273.98 L349.79,255.24 L359.16,228.77 L376.92,236.99 L391.71,238.96 L397.63,241.26 L408.48,241.59 L435.77,247.18 L446.95,247.84 L464.71,252.44 L472.93,253.10 L477.20,252.12 L483.78,254.09 L489.53,254.25 L484.93,287.46 L479.67,303.90 L444.98,333.33 L433.80,337.60 L430.84,337.60 L424.27,341.55 Z" },
+  { n: 13, d: "M341.41,387.91 L326.28,387.91 L307.87,381.99 L300.64,383.31 L294.06,387.25 L286.00,386.10 L288.31,370.65 L281.07,358.48 L279.43,351.91 L279.43,347.63 L281.07,344.02 L278.77,323.63 L280.09,314.10 L279.76,290.75 L286.83,291.57 L288.80,293.54 L296.36,296.83 L308.53,296.18 L335.82,284.01 L346.34,264.94 L364.92,285.82 L384.97,312.45 L414.24,347.96 L407.50,350.43 L397.96,358.65 L392.04,360.62 L364.42,376.40 L355.22,379.36 L345.68,386.60 L341.41,387.91 Z" },
+  { n: 14, d: "M281.24,385.94 L260.85,382.65 L253.95,379.03 L235.20,373.77 L228.96,369.83 L192.79,359.31 L177.33,352.73 L168.46,350.76 L165.66,348.62 L180.46,326.26 L189.66,316.73 L200.84,301.60 L208.41,294.37 L214.32,284.83 L216.79,282.37 L220.90,280.89 L225.83,271.35 L228.30,268.88 L232.24,268.88 L237.51,271.19 L256.58,282.37 L266.77,285.00 L275.81,290.09 L275.81,316.40 L274.50,323.30 L276.47,344.35 L274.82,350.26 L277.46,360.46 L284.03,371.64 L282.39,384.13 L281.24,385.94 Z" },
+  { n: 15, d: "M160.57,347.14 L155.30,343.85 L147.41,342.54 L144.12,340.56 L133.60,337.93 L128.67,334.32 L116.83,329.06 L108.29,321.82 L103.68,321.16 L96.78,313.60 L90.04,323.30 L81.32,332.01 L79.02,333.00 L69.49,332.34 L67.35,329.88 L67.02,319.68 L72.61,313.44 L73.27,310.15 L68.50,305.38 L61.92,306.37 L59.79,304.23 L59.79,302.59 L62.91,301.11 L66.36,296.01 L93.32,252.61 L106.15,236.83 L125.88,216.44 L130.64,207.73 L161.22,235.35 L172.73,247.84 L175.69,248.83 L178.98,252.12 L181.28,252.44 L185.55,249.16 L195.75,254.75 L205.61,252.12 L224.19,266.75 L218.93,276.28 L210.38,282.53 L207.09,289.11 L194.27,302.59 L188.68,311.46 L178.81,321.66 L168.62,335.47 L162.70,345.66 L160.57,347.14 Z" },
+  { n: 16, d: "M50.09,305.71 L41.54,305.38 L33.98,302.75 L29.87,299.63 L21.65,279.57 L24.28,257.54 L21.48,254.75 L17.21,255.40 L12.93,253.43 L7.84,248.99 L10.30,245.54 L19.67,239.46 L20.99,230.91 L25.26,221.04 L35.46,210.85 L38.74,203.95 L40.55,202.14 L47.46,200.16 L51.57,195.73 L58.47,180.93 L63.07,175.67 L80.50,143.45 L92.01,127.01 L97.93,121.09 L99.08,114.68 L109.60,119.94 L116.51,125.20 L135.90,131.44 L141.17,135.72 L144.29,136.87 L152.18,151.99 L155.47,164.16 L156.13,171.07 L159.09,175.34 L149.06,178.13 L139.85,184.05 L126.21,198.68 L117.66,210.85 L96.94,233.21 L80.83,255.24 L56.50,293.05 L50.09,305.71 Z" },
+  { n: 17, d: "M143.80,131.12 L134.26,125.85 L118.15,121.25 L110.59,115.66 L101.54,110.89 L101.87,108.92 L105.49,104.65 L105.16,99.06 L110.42,89.19 L126.04,74.56 L139.52,67.00 L146.10,60.75 L153.66,56.48 L157.28,52.86 L167.14,47.93 L171.74,42.34 L184.57,31.82 L199.36,26.56 L217.78,15.71 L227.31,13.40 L242.77,14.06 L241.94,26.72 L240.30,31.32 L238.99,44.15 L236.35,51.05 L236.35,57.63 L232.41,77.68 L231.75,88.21 L233.40,91.17 L218.43,97.25 L184.24,103.50 L166.48,109.74 L157.61,111.06 L149.55,117.14 L143.80,131.12 Z" },
+  { n: 18, d: "M274.00,96.59 L257.89,91.33 L251.32,90.34 L244.74,86.73 L241.78,87.06 L239.15,90.01 L236.35,87.22 L236.68,76.04 L240.63,56.97 L240.63,51.71 L243.26,44.15 L243.92,34.94 L246.55,23.43 L246.55,17.18 L247.70,15.05 L258.22,13.40 L298.99,12.42 L314.45,15.05 L326.28,12.09 L331.54,12.09 L342.07,14.39 L349.63,14.39 L359.00,12.58 L356.70,33.95 L357.35,40.53 L360.64,50.72 L359.33,58.29 L347.00,86.73 L340.09,85.41 L326.94,87.71 L309.51,87.71 L288.14,91.99 L274.00,96.59 Z" },
+  { n: 19, d: "M383.17,141.31 L380.70,140.16 L363.27,115.83 L362.29,95.11 L359.16,91.00 L353.57,88.04 L352.42,86.23 L358.01,70.45 L363.27,60.26 L364.26,54.01 L366.23,51.38 L360.97,37.24 L362.62,15.21 L363.44,12.42 L414.07,14.06 L426.90,19.65 L436.93,34.28 L438.90,58.94 L441.86,66.83 L440.87,72.75 L445.80,88.54 L455.17,98.89 L467.34,103.82 L473.09,108.92 L467.01,111.72 L454.19,121.25 L441.36,127.17 L433.14,129.47 L422.62,129.47 L409.47,131.12 L383.17,141.31 Z" },
+  { n: 20, d: "M490.36,250.14 L476.55,247.84 L466.35,248.50 L444.32,243.24 L444.82,235.18 L434.29,212.17 L427.88,205.75 L417.85,199.01 L414.57,188.16 L409.31,176.65 L403.72,171.39 L393.19,154.62 L387.28,149.69 L384.97,145.09 L410.46,135.39 L420.98,133.75 L432.16,133.75 L441.36,131.77 L454.19,126.18 L470.63,114.35 L474.90,113.03 L479.01,119.77 L480.66,136.21 L483.94,140.16 L485.59,148.38 L486.25,185.53 L489.53,207.89 L488.22,223.67 L492.16,235.51 L492.16,242.09 L490.36,250.14 Z" },
+];
+const PARIS_SEINE_PATH = "M57.32,304.07 L53.54,301.27 L54.20,297.33 L85.76,248.33 L96.28,234.52 L140.84,183.72 L149.71,178.13 L158.92,175.83 L161.88,173.53 L168.13,175.50 L213.83,174.85 L217.12,176.82 L221.07,176.82 L224.02,180.11 L247.04,190.96 L269.40,199.18 L279.92,201.48 L282.06,204.27 L278.44,207.23 L278.44,208.88 L283.87,217.26 L288.47,218.25 L306.55,228.44 L311.49,227.46 L314.12,230.74 L326.28,236.00 L328.42,238.80 L324.31,242.58 L296.03,231.40 L288.47,226.47 L286.17,226.47 L271.04,211.34 L264.47,206.74 L255.59,202.47 L243.75,199.84 L227.31,189.97 L212.52,183.72 L159.58,183.72 L149.06,187.67 L133.44,203.29 L126.21,215.45 L95.63,248.99 L64.06,298.97 L57.32,304.07 Z";
+
+const KNOWN_ZONES = ["Rive gauche", "Rive droite centre", "Rive droite ouest"];
+
+/* Zone → arrondissement numbers, from prototype/paris_arrondissements.svg
+   (stable ids arr-1..arr-20). Rive droite centre = 1-4, Rive gauche = 5-7,
+   Rive droite ouest = 8/16/17. The other 10 stay grey context. */
+const ZONE_ARRONDISSEMENTS = {
+  "Rive droite centre": [1, 2, 3, 4],
+  "Rive gauche":        [5, 6, 7],
+  "Rive droite ouest":  [8, 16, 17],
+};
+
+/* Three accent-blue tints by zone rank (most → least leads). Neutral/factual
+   per ADR-0012 — Bloc 4 carries no semantic colour. */
+const ZONE_TINTS = ["#5B6DFF", "#9AA6FF", "#C2C9FF"];
+const ZONE_GREY  = "#E6E6EA";
+
+/* Bloc 4 sub-distribution orderings (form-order, per V1_SCOPE §4). */
+const BUDGET_ORDER  = ["Moins de 1M", "1M–2M", "2M–4M", "4M+"];
+const TIMING_DIST_ORDER = ["Immédiatement", "Dans les 6 prochains mois", "Plus de 6 mois"];
+const FEATURE_ORDER = ["Vue dégagée", "Style haussmannien", "Architecture contemporaine signée", "Autre"];
+
+/* Rolling-window count. `days` back from now (inclusive). Used by Bloc 1 KPIs
+   and their velocity deltas. Rolling (not calendar) so the headline never
+   resets to near-zero on a Monday / the 1st (ADR-0012). */
+function countInRollingWindow(leads, days, offsetWindows = 0) {
+  const now   = Date.now();
+  const span  = days * 24 * 60 * 60 * 1000;
+  const end   = now - offsetWindows * span;
+  const start = end - span;
+  return leads.filter(l => {
+    if (!l.createdAt) return false;
+    const t = new Date(l.createdAt).getTime();
+    return t > start && t <= end;
+  }).length;
+}
+
+/* Velocity delta: % change of current window vs the equivalent previous one.
+   Returns { pct, dir }. dir ∈ "up"|"down"|"flat". null previous (0 leads
+   before) → flat with no pct so we don't divide by zero / show +Inf%. */
+function velocityDelta(curr, prev) {
+  if (prev === 0) return { pct: null, dir: curr > 0 ? "up" : "flat" };
+  const change = Math.round(((curr - prev) / prev) * 100);
+  return { pct: change, dir: change > 0 ? "up" : change < 0 ? "down" : "flat" };
+}
+
+/* Does this lead's createdAt fall within the active dashboard Période?
+   Mirrors the Leads Filters panel date math exactly (computeLeadsView) so the
+   date language is shared (ADR-0012). null preset = all dates. */
+function leadInPeriode(lead, periode) {
+  if (!periode) return true;
+  if (!lead.createdAt) return false;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (periode === "today") return lead.createdAt.slice(0, 10) === todayIso;
+  if (periode === "month")  return lead.createdAt.slice(0, 7) === new Date().toISOString().slice(0, 7);
+  const days = periode === "7d" ? 7 : periode === "30d" ? 30 : null;
+  if (days == null) return true;
+  const floor = new Date();
+  floor.setDate(floor.getDate() - days);
+  floor.setHours(0, 0, 0, 0);
+  return new Date(lead.createdAt) >= floor;
+}
+
+const PERIODE_LABELS = {
+  null:    "Toutes les dates",
+  today:   "Aujourd'hui",
+  "7d":    "7 derniers jours",
+  "30d":   "30 derniers jours",
+  month:   "Ce mois",
+};
+
+/* Lead age in whole days from createdAt to now. */
+function leadAgeDays(lead) {
+  if (!lead.createdAt) return 0;
+  return (Date.now() - new Date(lead.createdAt).getTime()) / (24 * 60 * 60 * 1000);
+}
+
+/* Aggregate the buyer set into the per-bloc shape the dashboard renders.
+   Mirrors computeLeadsView's role. Scoped by Période + Campagne. The non-Paris
+   demo campaign swaps in fabricated secteur values so the fallback layout is
+   reviewable now (matches the mockup's Campagne switcher). */
+function computeDashboardView(periode, campagne) {
+  const demoNonParis = campagne === "__demo_non_paris__";
+
+  // Buyer leads only (V1 is buyer-only). Scope by Période + Campagne.
+  let leads = state.leads.filter(l => l.type === "buyer");
+  const allBuyers = leads;
+  if (!demoNonParis && campagne) leads = leads.filter(l => l.campaign === campagne);
+  const scoped = leads.filter(l => leadInPeriode(l, periode));
+
+  const total = scoped.length;
+
+  // ── Bloc 1 — Vue globale (rolling KPIs / single-period card) ──
+  // Rolling KPIs always compute off the full buyer set (campagne-scoped),
+  // independent of the Période preset: they ARE the time view. When a specific
+  // Période is set, Bloc 1 collapses to a single "sur la période" card.
+  const rollingBase = demoNonParis ? allBuyers : leads;
+  const week   = countInRollingWindow(rollingBase, 7);
+  const weekPrev = countInRollingWindow(rollingBase, 7, 1);
+  const month  = countInRollingWindow(rollingBase, 30);
+  const monthPrev = countInRollingWindow(rollingBase, 30, 1);
+
+  // ── Bloc 2 — Scores ──
+  const scoreCounts = { hot: 0, warm: 0, cold: 0, none: 0 };
+  scoped.forEach(l => {
+    const s = SCORE_VALUES.includes(l.score) ? l.score : "none";
+    scoreCounts[s]++;
+  });
+
+  // ── Bloc 3 — Statuts (forward stages + Perdu split) ──
+  const statusCounts = { nouveau: 0, a_contacter: 0, contacte: 0, visite_prevue: 0, lost: 0 };
+  scoped.forEach(l => {
+    if (statusCounts[l.status] !== undefined) statusCounts[l.status]++;
+  });
+
+  // ── À traiter en priorité (ADR-0013) ──
+  const immediatesUntreated = scoped.filter(l =>
+    l.contactPreference === "Tout de suite" && l.status === "nouveau").length;
+  const agingNouveau = scoped.filter(l =>
+    l.status === "nouveau" && leadAgeDays(l) > AGING_THRESHOLD_DAYS).length;
+
+  // ── Bloc 4 — Réponses Meta Ads ──
+  // Secteurs. Paris-mode when every present secteur is a known zone.
+  let secteurRows, parisMode;
+  if (demoNonParis) {
+    parisMode = false;
+    secteurRows = [
+      { label: "Neuilly", count: 5 },
+      { label: "Boulogne-Billancourt", count: 4 },
+      { label: "Levallois-Perret", count: 3 },
+      { label: "Saint-Cloud", count: 2 },
+    ];
+  } else {
+    const secteurCounts = {};
+    scoped.forEach(l => { if (l.secteur) secteurCounts[l.secteur] = (secteurCounts[l.secteur] || 0) + 1; });
+    const present = Object.keys(secteurCounts);
+    parisMode = present.length > 0 && present.every(s => KNOWN_ZONES.includes(s));
+    secteurRows = present
+      .map(label => ({ label, count: secteurCounts[label] }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  const distOf = (order, pick) => {
+    const counts = {};
+    order.forEach(k => { counts[k] = 0; });
+    scoped.forEach(l => {
+      const vals = pick(l);
+      (Array.isArray(vals) ? vals : [vals]).forEach(v => {
+        if (v == null) return;
+        if (counts[v] === undefined) counts[v] = 0;
+        counts[v]++;
+      });
+    });
+    return order
+      .filter(k => counts[k] !== undefined)
+      .map(label => ({ label, count: counts[label] }));
+  };
+
+  const budgets  = distOf(BUDGET_ORDER, l => l.budget);
+  const timings  = distOf(TIMING_DIST_ORDER, l => leadTimeline(l));
+  const features = distOf(FEATURE_ORDER, l => l.features || []);
+
+  return {
+    total, periode, campagne, demoNonParis,
+    bloc1: { week, weekPrev, month, monthPrev },
+    scores: scoreCounts,
+    statuses: statusCounts,
+    priorities: { immediatesUntreated, agingNouveau },
+    meta: { parisMode, secteurRows, budgets, timings, features },
+  };
+}
+
+/* ── Render primitives ─────────────────────────────────────────── */
+
+/* One horizontal-bar row. `max` scales the fill (relative to the biggest row
+   in its group, so a group reads as a comparison). colorHex paints both dot
+   and fill; pass dot=false for the factual Bloc-4 groups that don't carry a
+   leading dot. */
+function renderDistRow(label, count, max, colorHex, opts = {}) {
+  const w = max > 0 ? Math.max(2, Math.round((count / max) * 100)) : 0;
+  const dot = opts.dot === false ? "" :
+    `<span class="dash-bar-dot" style="background:${colorHex}"></span>`;
+  return `
+    <div class="dash-bar-row${opts.muted ? " dash-bar-row--muted" : ""}">
+      <span class="dash-bar-label">${dot}${label}</span>
+      <span class="dash-bar-track"><span class="dash-bar-fill" style="width:${w}%;background:${colorHex}"></span></span>
+      <span class="dash-bar-val">${count}</span>
+    </div>`;
+}
+
+/* Bloc-4 factual group (label above, value top-right, full-width track below).
+   Matches the mockup's .b4-col layout. */
+function renderDashFactGroup(title, rows, caption = "") {
+  const max = rows.reduce((m, r) => Math.max(m, r.count), 0);
+  const cap = caption
+    ? `<span class="dash-fact-multi">${caption}</span>` : "";
+  return `
+    <div class="dash-fact-col">
+      <h4 class="dash-fact-h">${title}${cap}</h4>
+      <div class="dash-fact-bars">
+        ${rows.map(r => {
+          const w = max > 0 ? Math.max(2, Math.round((r.count / max) * 100)) : 0;
+          return `
+            <div class="dash-fact-row">
+              <span class="dash-fact-label">${r.label}</span>
+              <span class="dash-fact-val">${r.count}</span>
+              <span class="dash-fact-track"><span class="dash-fact-fill" style="width:${w}%"></span></span>
+            </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+}
+
+function dashDeltaPill(delta) {
+  if (delta.pct == null) {
+    return `<span class="dash-delta dash-delta--flat">—</span>`;
+  }
+  const up   = delta.dir === "up";
+  const flat = delta.dir === "flat";
+  const cls  = flat ? "flat" : up ? "up" : "down";
+  const arrow = flat ? ""
+    : up
+      ? `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9 L9 3"/><path d="M5.5 3 L9 3 L9 6.5"/></svg>`
+      : `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3 L9 9"/><path d="M5.5 9 L9 9 L9 5.5"/></svg>`;
+  const sign = delta.pct > 0 ? "+" : "";
+  return `<span class="dash-delta dash-delta--${cls}">${arrow}${sign}${delta.pct}%</span>`;
+}
+
+/* Bloc 1 — adaptive. Default (Toutes les dates) = two rolling KPI cards;
+   a specific Période = single "Leads sur la période" card. */
+function renderDashBloc1(dv) {
+  if (!dv.periode) {
+    const wDelta = velocityDelta(dv.bloc1.week, dv.bloc1.weekPrev);
+    const mDelta = velocityDelta(dv.bloc1.month, dv.bloc1.monthPrev);
+    return `
+      <section class="dash-block">
+        <div class="dash-block-title">Vue globale
+          <span class="dash-hint">fenêtres glissantes · vélocité vs période équivalente précédente</span>
+        </div>
+        <div class="dash-kpi-row">
+          <div class="dash-kpi">
+            <div class="dash-kpi-top">
+              <div class="dash-kpi-n">${dv.bloc1.week}</div>
+              ${dashDeltaPill(wDelta)}
+            </div>
+            <div class="dash-kpi-l">Cette semaine</div>
+            <div class="dash-kpi-w">7 derniers jours · vs 7 jours précédents</div>
+          </div>
+          <div class="dash-kpi">
+            <div class="dash-kpi-top">
+              <div class="dash-kpi-n">${dv.bloc1.month}</div>
+              ${dashDeltaPill(mDelta)}
+            </div>
+            <div class="dash-kpi-l">Ce mois</div>
+            <div class="dash-kpi-w">30 derniers jours · vs 30 jours précédents</div>
+          </div>
+        </div>
+      </section>`;
+  }
+  // Single-period variant. Compare the period's count against the equivalent
+  // previous window where the preset maps to a rolling span (7d / 30d); for
+  // today / month we show the count without a synthetic delta.
+  let delta = { pct: null, dir: "flat" }, windowNote = "";
+  if (dv.periode === "7d")  { delta = velocityDelta(dv.bloc1.week,  dv.bloc1.weekPrev);  windowNote = "7 derniers jours · vs 7 jours précédents"; }
+  else if (dv.periode === "30d") { delta = velocityDelta(dv.bloc1.month, dv.bloc1.monthPrev); windowNote = "30 derniers jours · vs 30 jours précédents"; }
+  else windowNote = PERIODE_LABELS[dv.periode];
+  return `
+    <section class="dash-block">
+      <div class="dash-block-title">Vue globale
+        <span class="dash-hint">période : ${PERIODE_LABELS[dv.periode]}</span>
+      </div>
+      <div class="dash-kpi-row dash-kpi-row--single">
+        <div class="dash-kpi">
+          <div class="dash-kpi-top">
+            <div class="dash-kpi-n">${dv.total}</div>
+            ${(dv.periode === "7d" || dv.periode === "30d") ? dashDeltaPill(delta) : ""}
+          </div>
+          <div class="dash-kpi-l">Leads sur la période</div>
+          <div class="dash-kpi-w">${windowNote}</div>
+        </div>
+      </div>
+    </section>`;
+}
+
+/* À traiter en priorité (ADR-0013). Two tiles, both tappable → Leads page
+   pre-filtered via a Vue rapide chip (ADR-0014). */
+function renderDashPriorities(dv) {
+  const p = dv.priorities;
+  return `
+    <section class="dash-block">
+      <div class="dash-block-title">À traiter en priorité
+        <span class="dash-hint">action requise · cliquer ouvre la liste filtrée</span>
+      </div>
+      <div class="dash-priorities">
+        <button class="dash-priority dash-priority--urgent" data-action="vue-rapide-demandes-immediates">
+          <span class="dash-priority-mark"></span>
+          <span class="dash-priority-body">
+            <span class="dash-priority-count">${p.immediatesUntreated}</span>
+            <span class="dash-priority-label">Demandes immédiates non traitées</span>
+            <span class="dash-priority-sub">le lead a coché « Tout de suite » dans le formulaire</span>
+          </span>
+          <span class="dash-priority-arrow">${icon.chevronRight ? icon.chevronRight() : ""}</span>
+        </button>
+        <button class="dash-priority dash-priority--aging" data-action="vue-rapide-aging-nouveau">
+          <span class="dash-priority-mark"></span>
+          <span class="dash-priority-body">
+            <span class="dash-priority-count">${p.agingNouveau}</span>
+            <span class="dash-priority-label">En Nouveau depuis +${AGING_THRESHOLD_DAYS}&nbsp;jours</span>
+            <span class="dash-priority-sub">risque d'attrition si pas de premier contact</span>
+          </span>
+          <span class="dash-priority-arrow">${icon.chevronRight ? icon.chevronRight() : ""}</span>
+        </button>
+      </div>
+    </section>`;
+}
+
+/* Scores + Statuts side-by-side pair. */
+function renderDashScoresStatuts(dv) {
+  const sc = dv.scores;
+  const scoreMeta = [
+    { key: "hot",  label: "Chaud",      hex: "#E24B4A" },
+    { key: "warm", label: "Tiède",      hex: "#F5B94C" },
+    { key: "cold", label: "Froid",      hex: "#85B7EB" },
+    { key: "none", label: "Non évalué", hex: "#B6B3AC" },
+  ];
+  const scoreMax = Math.max(...scoreMeta.map(m => sc[m.key]), 0);
+
+  const st = dv.statuses;
+  const stageMeta = [
+    { key: "nouveau",       label: "Nouveau",       hex: "#8A8780" },
+    { key: "a_contacter",   label: "À contacter",   hex: "#C99A3E" },
+    { key: "contacte",      label: "Contacté",      hex: "#6D48DB" },
+    { key: "visite_prevue", label: "Visite prévue", hex: "#2F9D6F" },
+  ];
+  const stageMax = Math.max(...stageMeta.map(m => st[m.key]), st.lost, 0);
+
+  return `
+    <div class="dash-pair">
+      <section class="dash-block">
+        <div class="dash-block-title">Répartition des scores</div>
+        <div class="dash-bars">
+          ${scoreMeta.map(m => renderDistRow(m.label, sc[m.key], scoreMax, m.hex)).join("")}
+        </div>
+      </section>
+      <section class="dash-block">
+        <div class="dash-block-title">Répartition des statuts</div>
+        <div class="dash-bars">
+          ${stageMeta.map(m => renderDistRow(m.label, st[m.key], stageMax, m.hex)).join("")}
+        </div>
+        <div class="dash-terminal-split">
+          ${renderDistRow("Perdu", st.lost, stageMax, "#D98989", { muted: true })}
+        </div>
+      </section>
+    </div>`;
+}
+
+/* The Paris arrondissement map (Bloc 4 Paris-mode hero). Inlined from
+   prototype/paris_arrondissements.svg (viewBox 500×400, ids arr-1..arr-20).
+   Arrondissements are painted by their zone's lead-count rank (3 accent-blue
+   tints); the 10 uncovered ones stay grey context. Neutral/factual colour. */
+function renderParisMap(secteurRows) {
+  // Rank present known zones by count → tint index.
+  const ranked = secteurRows
+    .filter(r => KNOWN_ZONES.includes(r.label))
+    .slice()
+    .sort((a, b) => b.count - a.count);
+  const zoneTint = {};
+  ranked.forEach((r, i) => { zoneTint[r.label] = ZONE_TINTS[Math.min(i, ZONE_TINTS.length - 1)]; });
+  // arr number → fill
+  const arrFill = {};
+  Object.entries(ZONE_ARRONDISSEMENTS).forEach(([zone, arrs]) => {
+    arrs.forEach(n => { arrFill[n] = zoneTint[zone] || ZONE_GREY; });
+  });
+  const paths = PARIS_ARR_PATHS.map(p =>
+    `<path d="${p.d}" fill="${arrFill[p.n] || ZONE_GREY}"/>`
+  ).join("");
+  return `
+    <svg class="dash-map-svg" viewBox="0 0 500 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Carte des arrondissements ciblés">
+      <g stroke="#C9C9CF" stroke-width="1" stroke-linejoin="round">${paths}</g>
+      <path fill="#F7F7F3" stroke="#C9C9CF" stroke-width="1" stroke-linejoin="round" d="${PARIS_SEINE_PATH}"/>
+    </svg>`;
+}
+
+function renderDashMeta(dv) {
+  const m = dv.meta;
+  const secteurMax = m.secteurRows.reduce((mx, r) => Math.max(mx, r.count), 0);
+  // tints for the secteur bars (match the map ranks in Paris-mode)
+  const ranked = m.secteurRows.slice().sort((a, b) => b.count - a.count);
+  const tintOf = {};
+  ranked.forEach((r, i) => { tintOf[r.label] = ZONE_TINTS[Math.min(i, ZONE_TINTS.length - 1)]; });
+
+  const secteurBars = m.secteurRows.map(r =>
+    renderDistRow(r.label, r.count, secteurMax, tintOf[r.label] || "#5B6DFF")
+  ).join("");
+
+  const secteurSection = m.parisMode
+    ? `
+      <div class="dash-sect">
+        <div class="dash-map-wrap">
+          ${renderParisMap(m.secteurRows)}
+          <div class="dash-map-cap">Secteurs ciblés · 10 arrondissements couverts</div>
+        </div>
+        <div class="dash-sect-bars">
+          <h4 class="dash-fact-h">Secteurs recherchés</h4>
+          <div class="dash-bars">${secteurBars}</div>
+          <div class="dash-map-legend">
+            <span class="dash-leg"><span class="dash-sw" style="background:#5B6DFF"></span>Plus de leads</span>
+            <span class="dash-leg"><span class="dash-sw" style="background:#C2C9FF"></span>Moins de leads</span>
+            <span class="dash-leg"><span class="dash-sw" style="background:#E6E6EA"></span>Hors secteurs ciblés</span>
+          </div>
+        </div>
+      </div>`
+    : `
+      <div class="dash-sect dash-sect--no-paris">
+        <h4 class="dash-fact-h">Autres secteurs
+          <span class="dash-fact-multi">la carte Paris s'efface quand les secteurs du formulaire sortent des trois zones connues</span>
+        </h4>
+        <div class="dash-bars dash-bars--wide">${secteurBars}</div>
+      </div>`;
+
+  return `
+    <section class="dash-block">
+      <div class="dash-block-title">Répartition des réponses Meta Ads</div>
+      ${secteurSection}
+      <hr class="dash-b4-divider">
+      <div class="dash-fact-cols">
+        ${renderDashFactGroup("Budgets", m.budgets)}
+        ${renderDashFactGroup("Timing projet", m.timings)}
+        ${renderDashFactGroup("Caractéristiques", m.features, "plusieurs réponses possibles")}
+      </div>
+    </section>`;
+}
+
+/* Page-level Période + Campagne filters (next to the H1). */
+function renderDashFilters() {
+  const periodes = [
+    { v: "", label: "Toutes les dates" },
+    { v: "today", label: "Aujourd'hui" },
+    { v: "7d", label: "7 derniers jours" },
+    { v: "30d", label: "30 derniers jours" },
+    { v: "month", label: "Ce mois" },
+  ];
+  // Campaign options from the live buyer seed, with counts. Plus the demo
+  // non-Paris option (demonstrates the map fallback on fabricated data).
+  const buyers = state.leads.filter(l => l.type === "buyer");
+  const campCounts = {};
+  buyers.forEach(l => { if (l.campaign) campCounts[l.campaign] = (campCounts[l.campaign] || 0) + 1; });
+  const campOpts = Object.entries(campCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, n]) => `<option value="${name}"${state.dashCampagne === name ? " selected" : ""}>${name} (${n})</option>`)
+    .join("");
+  const periodeSel = periodes.map(p =>
+    `<option value="${p.v}"${(state.dashPeriode || "") === p.v ? " selected" : ""}>${p.label}</option>`
+  ).join("");
+  return `
+    <div class="dash-filters">
+      <div class="dash-filter">
+        <label for="dash-periode">Période</label>
+        <select id="dash-periode" data-action="set-dash-periode">${periodeSel}</select>
+      </div>
+      <div class="dash-filter">
+        <label for="dash-campagne">Campagne</label>
+        <select id="dash-campagne" data-action="set-dash-campagne">
+          <option value=""${!state.dashCampagne ? " selected" : ""}>Toutes les campagnes</option>
+          ${campOpts}
+          <option value="__sep__" disabled>──────────</option>
+          <option value="__demo_non_paris__"${state.dashCampagne === "__demo_non_paris__" ? " selected" : ""}>— Démo : Agence hors Paris —</option>
+        </select>
+      </div>
+    </div>`;
+}
+
+function renderDashboard() {
+  const dv = computeDashboardView(state.dashPeriode, state.dashCampagne);
+  return `
+    <div class="dashboard">
+      <div class="dash-head">
+        <div class="dash-head-title">
+          <h1>Tableau de bord</h1>
+          <div class="dash-sub">Vue d'ensemble des leads acquéreurs${dv.demoNonParis ? " · données démo (hors Paris)" : ""}</div>
+        </div>
+        ${renderDashFilters()}
+      </div>
+      <div class="dash-content">
+        ${renderDashBloc1(dv)}
+        ${renderDashPriorities(dv)}
+        ${renderDashScoresStatuts(dv)}
+        ${renderDashMeta(dv)}
+      </div>
+    </div>`;
+}
+
 function renderRouteContent() {
   if (state.route === "leads") return renderLeadsContent();
+  if (state.route === "dashboard") return renderDashboard();
   return renderRouteComingSoon();
 }
 
@@ -5169,6 +6002,31 @@ document.addEventListener("click", (e) => {
       // Stub — opens the "Ajouter un prospect" modal. Form built after Step 2.
       alert("Ajouter un prospect — à venir. Construit après l'étape 2.");
       break;
+
+    // v0.18 — À traiter en priorité tiles (ADR-0013) navigate to the Leads
+    // page pre-filtered via a Vue rapide chip (ADR-0014). The chip carries the
+    // dashboard's active Campagne too, so scope doesn't silently drop. The
+    // chip constraints can't all be expressed by the Filters panel
+    // (contactPreference, age threshold, campaign), which is exactly why the
+    // chip pattern exists. Pushing a chip resets the panel-native dims so the
+    // landing view is purely the chip's subset (then composable on top).
+    case "vue-rapide-demandes-immediates":
+      applyVueRapide({
+        kind: "demandes-immediates",
+        label: "Demandes immédiates non traitées",
+      });
+      break;
+    case "vue-rapide-aging-nouveau":
+      applyVueRapide({
+        kind: "aging-nouveau",
+        label: `En Nouveau depuis +${AGING_THRESHOLD_DAYS} jours`,
+      });
+      break;
+    case "clear-vue-rapide": {
+      const kind = target.getAttribute("data-vr-kind");
+      setState({ vueRapide: state.vueRapide.filter(v => v.kind !== kind), leadsPage: 1 });
+      break;
+    }
     case "row-click": {
       const leadId = Number(target.getAttribute("data-lead-id"));
       // In select mode, row click toggles lead selection. Out of select mode,
@@ -5476,6 +6334,19 @@ document.addEventListener("input", (e) => {
   if (next) {
     next.focus();
     try { next.setSelectionRange(cursorPos, cursorPos); } catch (_) { /* no-op on unsupported inputs */ }
+  }
+});
+
+// v0.18 — Tableau de bord page-level filters are native <select>s, which fire
+// "change" (not click/input). Both rescope every bloc via computeDashboardView.
+document.addEventListener("change", (e) => {
+  const sel = e.target.closest("select[data-action]");
+  if (!sel) return;
+  const action = sel.getAttribute("data-action");
+  if (action === "set-dash-periode") {
+    setState({ dashPeriode: sel.value || null });
+  } else if (action === "set-dash-campagne") {
+    setState({ dashCampagne: sel.value || null });
   }
 });
 
