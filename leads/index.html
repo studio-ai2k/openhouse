@@ -1,5 +1,24 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.2
+  Shell trim (cosmetic / honesty pass, no logic or stack change). Removed the
+  duplicate "Tableau de bord" h1 (the topbar page-title already names the page).
+  Removed the misleading "+" add-lead button (V1 leads arrive from Meta, not
+  hand-entry) and its stub handler. Trimmed the avatar menu to identity +
+  Déconnexion, dropping three go-nowhere stub items. Wired the bell badge to a
+  live count of buyer leads still in "Nouveau" (was a hardcoded 7); bell stays
+  display-only — clearable "seen" semantics need a field + backend, deferred to
+  V1.5. See CHANGELOG v0.18.2.
+
+  Open House Leads — v0.18.1
+  Docs-only ship (app unchanged except APP_VERSION + this comment + one stale
+  in-code comment corrected). The GitHub Pages build is fixed and v0.18.0 is
+  deployed and current — the deployed bundle is no longer frozen at ~v0.11.5.
+  STATUS / HANDOFF updated to reflect the live-and-current deploy; ADR-0015's
+  deferral of the Vue rapide URL transport now rests solely on "no router in
+  Phase 1" (the frozen-deploy premise it also cited no longer holds). See
+  CHANGELOG v0.18.1.
+
   Open House Leads — v0.18.0
   Tableau de bord built into the app. Ported the locked design-review mockup
   (prototype/dashboard_mockup.html) into live code: renderDashboard() fires on
@@ -18,7 +37,7 @@
   Filters panel (contactPreference / age threshold / campaign); the chip is the
   filter, composes with the panel, and the dashboard Campagne rides along as a
   second chip. URL transport (?view=…) deferred with the build (no router in
-  Phase 1; deployed bundle frozen — see PARKED). Aging threshold hardcoded to
+  Phase 1). Aging threshold hardcoded to
   AGING_THRESHOLD_DAYS (Greg-confirmed; brainstorm guess was 3d). No data-model
   change. Pre-dashboard snapshot kept at backups/leads-index.v0.16.1.html and the
   mockup kept as the design-review artifact. See CHANGELOG v0.18.0.
@@ -2810,10 +2829,7 @@
     display: flex; align-items: flex-start; justify-content: space-between;
     gap: 18px; flex-wrap: wrap; margin-bottom: 22px;
   }
-  .dash-head-title h1 {
-    font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary);
-  }
-  .dash-sub { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+  .dash-sub { font-size: 13px; color: var(--text-secondary); }
   .dash-filters { display: flex; align-items: center; gap: 18px; }
   .dash-filter { display: flex; align-items: center; gap: 9px; }
   .dash-filter label {
@@ -3152,7 +3168,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.0";
+const APP_VERSION = "v0.18.2";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -3259,10 +3275,10 @@ const state = {
   //   kind "campagne"            → campaign === value
   // At most one of each kind (a new push of the same kind replaces it).
   // URL transport (?view=…&campagne=…) is deferred with the build — the app
-  // has no router in Phase 1 and the deployed bundle is frozen, so deep-links
-  // are inert until the Pages redeploy. The chip *behaviour* (the ADR-0014
+  // has no router in Phase 1 (no history/location wiring anywhere), so there's
+  // nothing to parse a deep-link into yet. The chip *behaviour* (the ADR-0014
   // contract) ships now via in-memory state; the URL is the transport layer
-  // that lands when routing does. See PARKED.
+  // that lands when routing does. See PARKED, ADR-0015.
   vueRapide: [],
 
   // chrome state
@@ -3313,8 +3329,6 @@ const state = {
     { id: 2, initials: "MD", tone: "#0EA5E9", name: "Marc Delacroix" },
     { id: 3, initials: "JR", tone: "#A855F7", name: "Julie Renard" },
   ],
-
-  notifications: 7,
 
   // Dummy leads — stand-in until the Express/Postgres backend ships
   // (Phase 2 of the product stack per HANDOFF §1). Schema mirrors
@@ -3975,19 +3989,6 @@ function renderUserMenuDropdown() {
         </div>
       </div>
       <div class="user-menu-divider"></div>
-      <div class="user-menu-item" data-action="go-profile" role="menuitem">
-        ${icon.user()}
-        <span>Mon compte</span>
-      </div>
-      <div class="user-menu-item" data-action="go-preferences" role="menuitem">
-        ${icon.settings()}
-        <span>Préférences</span>
-      </div>
-      <div class="user-menu-item" data-action="go-help" role="menuitem">
-        ${icon.help()}
-        <span>Aide &amp; support</span>
-      </div>
-      <div class="user-menu-divider"></div>
       <div class="user-menu-item user-menu-item--danger" data-action="logout" role="menuitem">
         ${icon.logout()}
         <span>Déconnexion</span>
@@ -4059,11 +4060,18 @@ function renderTopbar() {
       </div>
       <div class="topbar-actions">
         <div class="topbar-actions-icons">
-          <button class="icon-btn" data-action="add-lead" aria-label="Ajouter un prospect" title="Ajouter un prospect">${icon.plus()}</button>
-          <button class="icon-btn" aria-label="Notifications">
+          ${(() => {
+            // Badge = buyer leads still in "Nouveau" (never-treated). Computed
+            // live off state — no hardcoded count. The "new leads since last
+            // seen" semantics (clearable badge) needs a seenAt/lastViewed field
+            // + backend persistence; that lands with the V1.5 backend. The bell
+            // is display-only in V1 (no data-action).
+            const newCount = state.leads.filter(l => l.type === "buyer" && l.status === "nouveau").length;
+            return `<button class="icon-btn" aria-label="${newCount} nouveau${newCount > 1 ? "x" : ""} lead${newCount > 1 ? "s" : ""}" title="${newCount} lead${newCount > 1 ? "s" : ""} en Nouveau">
             ${icon.bell()}
-            ${state.notifications > 0 ? `<span class="notif-badge">${state.notifications}</span>` : ""}
-          </button>
+            ${newCount > 0 ? `<span class="notif-badge">${newCount}</span>` : ""}
+          </button>`;
+          })()}
         </div>
         ${renderSearch()}
         ${renderUserMenu()}
@@ -5624,7 +5632,6 @@ function renderDashboard() {
     <div class="dashboard">
       <div class="dash-head">
         <div class="dash-head-title">
-          <h1>Tableau de bord</h1>
           <div class="dash-sub">Vue d'ensemble des leads acquéreurs${dv.demoNonParis ? " · données démo (hors Paris)" : ""}</div>
         </div>
         ${renderDashFilters()}
@@ -5988,21 +5995,10 @@ document.addEventListener("click", (e) => {
       });
       break;
     }
-    case "go-profile":
-    case "go-preferences":
-    case "go-help":
-      // Stubs — will route to the right page when those pages exist
-      setState({ userMenuOpen: false });
-      break;
     case "logout":
       // Stub — real logout posts to /api/auth/logout on the Express backend later
       setState({ userMenuOpen: false });
       break;
-    case "add-lead":
-      // Stub — opens the "Ajouter un prospect" modal. Form built after Step 2.
-      alert("Ajouter un prospect — à venir. Construit après l'étape 2.");
-      break;
-
     // v0.18 — À traiter en priorité tiles (ADR-0013) navigate to the Leads
     // page pre-filtered via a Vue rapide chip (ADR-0014). The chip carries the
     // dashboard's active Campagne too, so scope doesn't silently drop. The
