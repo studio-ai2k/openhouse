@@ -1,5 +1,44 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.7
+  Docs-only ship (app code unchanged except APP_VERSION + this comment). Records
+  the multi-client architecture worked out in chat: ADR-0018 (deployment
+  topology — Model A isolated instance per early client with subdomain + own
+  repo + own client-owned Sheet; Model C true multi-tenant at scale; Open House
+  owns Railway at V2) and docs/DATA_FLOW.md (factual data-flow map for the DPA —
+  parties, sub-processors, where PII lives in V1.5 vs V2, written to feed Open
+  House's lawyer; not legal advice). See CHANGELOG v0.18.7.
+
+  Open House Leads — v0.18.6
+  Adds the login surface as its own file: leads/login.html — a static,
+  chrome-matched shell (gradient brand mark, token palette, French) that posts
+  nowhere yet (no auth endpoint exists). Built ahead of the backend cycle per
+  the auth decision, and deliberately standalone, not folded into index.html
+  (the login gate lives outside the app shell, so it sidesteps the parked
+  single-file split). index.html itself is unchanged except APP_VERSION + this
+  comment. V1_5_BACKEND_BRIEF §1 records the separate-file decision. See
+  CHANGELOG v0.18.6.
+
+  Open House Leads — v0.18.5
+  Docs-only ship (app code unchanged except APP_VERSION + this comment). Closes
+  the demo→real-leads decisions opened in v0.18.4: auth = in-app login screen;
+  writes = optimistic + a net-new toast/error primitive; the agency switcher =
+  a Meta-account selector keyed on meta_account_id (ADR-0017, resolving the city
+  question). Adds docs/META_INGESTION_BRIEF.md — V1 pulls leads directly from
+  the Meta API in Dev Mode (no App Review, gated on a one-time connectivity
+  test); CSV and Zapier demoted to fallbacks. SCHEMA_SPEC + V1_5_BACKEND_BRIEF
+  updated to match. No app behaviour change. See CHANGELOG v0.18.5.
+
+  Open House Leads — v0.18.4
+  Docs-only ship (app code unchanged except APP_VERSION + this comment). Records
+  the V1.5 datastore decision: ADR-0016 (a Postgres-shaped Sheet behind a
+  repository adapter — Sheet stays the V1 choice per ADR-0001, constructed so
+  the Postgres migration is a single-adapter swap) + docs/SCHEMA_SPEC.md (the
+  one spec serving both the Sheet header row and the future Postgres table:
+  columns, types, enums, tab inventory). Also adds docs/V1_5_BACKEND_BRIEF.md
+  (auth / write-contract / city decisions still open for Greg). No app
+  behaviour change. See CHANGELOG v0.18.4.
+
   Open House Leads — v0.18.3
   Shell trim, cont. (cosmetic, no logic or stack change). Removed the
   "Liste des leads" table-header title — the card is self-evidently the lead
@@ -3165,7 +3204,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.3";
+const APP_VERSION = "v0.18.7";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
