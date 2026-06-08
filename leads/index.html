@@ -1,5 +1,25 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.12
+  Drawer + dashboard polish, one bulk action, and a Messages rapides product
+  reversal — all on mock data, no backend. Six items: (1) dashboard breakdown
+  value column widened (34→60px desktop / 30→52px mobile) so "NN %" no longer
+  clips against the card edge — the value column was the cause, not the bar fill;
+  (2) bulk "Archiver (n)" in select mode — mirrors bulk-set-status' loop + the
+  single archive-lead mutation, live selected-count in the label; (3) drawer
+  footer restructured — Archive right-aligned above a footnote-styled Légende
+  with a hairline separator; (4) Archive button gated to the Infos tab (all
+  widths), Légende footnote Infos-tab AND mobile only (Items 3+4 = one footer
+  pass); (5) Messages rapides reversal — editable GLOBAL templates
+  (state.messageTemplates {whatsapp, email}, seeded from the MSG_* constants),
+  WhatsApp/Email toggle, dirty-state Enregistrer (greyed→black, dirty = live ≠
+  saved snapshot), focus-safe input mirroring Notes; email BODY editable, subject
+  stays constant; handoff uses the edited text → ADR-0023; (6) V2 communication
+  log recorded, not built (revives dormant lead.activity[]) → ADR-0024. Verified
+  node --check (both files) + matchMedia-shimmed jsdom harness (desktop + mobile)
+  + the full Item 5 functional cycle (edit→dirty→save→clean→handoff; toggle swap;
+  focus preserved on keystroke). See CHANGELOG v0.18.12.
+
   Open House Leads — v0.18.11
   The deferred 31-05 feature set, on mock data — frontend now V1-complete pending
   the backend. Four items: (1) advanced combinable filters — Budget · Secteur ·
@@ -1576,12 +1596,24 @@
     background: var(--surface-tint);
   }
   /* v0.18.11 (ADR-0022) — drawer footer holds the Archive (or Restore) action.
-     Pinned below the scrolling body, separated by a hairline. */
+     Pinned below the scrolling body, separated by a hairline.
+     v0.18.12 — footer restructured: the action is right-aligned (no longer its
+     own heavy full-width strip); below it, on mobile only, the icon legend sits
+     as a footnote separated by a thin hairline. Footer renders on the Infos tab
+     only (Messages rapides / Notes have no footer). */
   .drawer-foot {
     padding: 14px 24px;
     border-top: 1px solid var(--border-subtle);
     background: var(--panel);
   }
+  .drawer-foot-actions { display: flex; justify-content: flex-end; }
+  .drawer-foot-legend {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-divider);
+  }
+  .drawer-foot-legend .icon-legend { gap: 8px; }
+  .drawer-foot-legend .icon-legend-label { font-size: 12px; color: var(--text-muted); }
   .drawer-foot-btn {
     display: inline-flex; align-items: center; gap: 8px;
     height: 38px; padding: 0 16px;
@@ -1753,6 +1785,30 @@
     line-height: 1.5;
     color: var(--text-muted);
   }
+
+  /* v0.18.12 (ADR-0023) — Messages rapides editable global template:
+     WhatsApp/Email toggle pills, the editable field (shares .notes-field
+     styling), and the Enregistrer save button with a dirty highlight. */
+  .msg-tpl { margin-top: 18px; }
+  .msg-tpl-toggle { display: inline-flex; gap: 4px; margin-bottom: 10px; padding: 3px; background: var(--surface-tint); border-radius: var(--r-pill); }
+  .msg-tpl-pill {
+    appearance: none; border: none; cursor: pointer;
+    padding: 6px 16px; border-radius: var(--r-pill);
+    background: transparent; color: var(--text-muted);
+    font: inherit; font-size: 13px; font-weight: 600;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .msg-tpl-pill:hover { color: var(--text-body); }
+  .msg-tpl-pill.is-active { background: var(--panel); color: var(--text-primary); box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .msg-tpl-field { min-height: 168px; }
+  .msg-tpl-foot { display: flex; justify-content: flex-end; margin-top: 12px; }
+  /* Save button: greyed-out (clean) by default; black font when dirty (edited
+     since last save). The .is-dirty class is toggled live on input without a
+     re-render (focus-safe), and set at render time from isDirty. */
+  .msg-tpl-save { color: var(--text-muted); border-color: var(--border-subtle); transition: color 120ms ease, border-color 120ms ease; }
+  .msg-tpl-save svg { opacity: 0.55; transition: opacity 120ms ease; }
+  .msg-tpl-save.is-dirty { color: var(--text-primary); border-color: var(--border-strong); }
+  .msg-tpl-save.is-dirty svg { opacity: 1; }
 
   /* Notes — single plain textarea */
   .notes-field {
@@ -3087,7 +3143,7 @@
 
   /* Bar rows (the shared visual family) */
   .dash-bars { display: flex; flex-direction: column; gap: 11px; }
-  .dash-bar-row { display: grid; grid-template-columns: 128px 1fr 34px; align-items: center; gap: 12px; }
+  .dash-bar-row { display: grid; grid-template-columns: 128px 1fr 60px; align-items: center; gap: 12px; }
   .dash-bar-label { font-size: 13.5px; font-weight: 500; color: var(--text-body); display: flex; align-items: center; gap: 8px; }
   .dash-bar-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
   .dash-bar-track { height: 11px; background: var(--surface-tint); border-radius: var(--r-pill); overflow: hidden; }
@@ -3160,7 +3216,7 @@
     .dash-pair { grid-template-columns: 1fr; }
     .dash-kpi-row { grid-template-columns: 1fr 1fr; gap: 12px; }
     .dash-priorities { grid-template-columns: 1fr; gap: 10px; }
-    .dash-bar-row { grid-template-columns: 108px 1fr 30px; }
+    .dash-bar-row { grid-template-columns: 108px 1fr 52px; }
   }
 
 
@@ -3337,7 +3393,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.11";
+const APP_VERSION = "v0.18.12";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -3460,6 +3516,17 @@ const state = {
   openStatusMenu: null,      // v0.13.0 inline Statut dropdown open-state. v0.13.2: { id, surface } — surface "row" (table/card) or "drawer", so the same lead's row menu and drawer menu don't open together
   openScoreMenu: null,       // inline Score dropdown open-state, same { id, surface } shape (drawer header qualification line)
   drawer: null,              // null | { leadId, tab: "infos"|"messages"|"notes" }  (v0.11.2: infos/messages/notes; v0.12.0 added "meta"; v0.13.2 folded "meta" into infos — back to 3)
+
+  // v0.18.12 (ADR-0023) — Messages rapides editable global templates.
+  // msgTab selects which template the in-drawer field shows/edits.
+  // messageTemplates holds the two canonical (global, shared-across-leads)
+  // templates; seeded from the MSG_* constants at boot (the constants are
+  // defined after this literal, so the seed happens just before the first
+  // render() — see bottom of file). Session-memory only in V1; the backend
+  // will persist them (config-as-CODE → DATA, same path as ADR-0021).
+  msgTab: "whatsapp",        // "whatsapp" | "email"
+  messageTemplates: null,    // { whatsapp, email } — seeded at boot
+  messageTemplatesSaved: null, // last-saved snapshot (dirty = live ≠ saved); backend-persisted target
 
   // Leads page state — consumed by the toggle, page search, filter tabs,
   // and pipeline bar. Lives at state root (not on state.route) so filter
@@ -5311,6 +5378,9 @@ function renderLeadsTable(view) {
       </button>
       ${scoreOpen ? renderBulkScoreMenu() : ""}
     </div>
+    <button class="leads-table-btn" data-action="bulk-archive">
+      ${icon.archive()}<span>Archiver (${nSelected})</span>
+    </button>
     <button class="leads-table-btn leads-table-btn--danger" data-action="bulk-delete">
       ${icon.trash()}<span>Supprimer</span>
     </button>
@@ -6253,15 +6323,27 @@ function renderDrawer() {
   // strip. Qualification (Statut + Score) lives in the header. Mobile adds the
   // icon legend below the card.
   const infosBody = `
-    ${renderMetaResponses(lead, campaign)}
-    ${isMobile() ? renderIconLegend() : ""}`;
+    ${renderMetaResponses(lead, campaign)}`;
 
-  // Messages rapides: 4 actions. Templates merged at render time and handed
-  // off to the device app (no in-drawer editor — V1_SCOPE §2.3).
-  const waText  = encodeURIComponent(mergeTemplate(MSG_WHATSAPP, lead));
+  // Messages rapides (v0.18.12, ADR-0023): editable GLOBAL templates. The two
+  // canonical templates live in state.messageTemplates {whatsapp, email}, shared
+  // across every lead; editing changes the standard message for everyone. Save
+  // is a session-memory shim (backend-shaped — the V1 backend will persist it).
+  // The email SUBJECT stays a constant (MSG_EMAIL_SUBJECT); only the body is
+  // editable (ADR-0023). Actions below merge + hand off using the (possibly
+  // edited) state templates, so a saved edit flows straight to wa.me / mailto.
+  const tpls    = state.messageTemplates;
+  const msgTab  = (state.msgTab === "email") ? "email" : "whatsapp";
+  const waText  = encodeURIComponent(mergeTemplate(tpls.whatsapp, lead));
   const mailSub = encodeURIComponent(mergeTemplate(MSG_EMAIL_SUBJECT, lead));
-  const mailBody = encodeURIComponent(mergeTemplate(MSG_EMAIL_BODY, lead));
-  const copyMsg = encodeURIComponent(mergeTemplate(MSG_WHATSAPP, lead));
+  const mailBody = encodeURIComponent(mergeTemplate(tpls.email, lead));
+  const copyMsg = encodeURIComponent(mergeTemplate(tpls.whatsapp, lead));
+  // Dirty = the active template diverges from the last SAVED snapshot (not the
+  // hardcoded seed) — so a saved edit reads clean even though it differs from
+  // the original default. The saved snapshot is what the backend will persist.
+  const savedValue  = (state.messageTemplatesSaved || {})[msgTab];
+  const activeValue = tpls[msgTab];
+  const isDirty     = activeValue !== savedValue;
   const messagesBody = `
     <div class="msg-actions">
       <a class="msg-btn" href="tel:${lead.phone.replace(/\s/g, "")}">
@@ -6276,6 +6358,25 @@ function renderDrawer() {
       <button class="msg-btn" data-action="copy-message" data-message="${copyMsg}">
         ${icon.copy()}<span>Copier message</span>
       </button>
+    </div>
+    <div class="msg-tpl">
+      <div class="msg-tpl-toggle" role="tablist" aria-label="Modèle de message">
+        <button class="msg-tpl-pill${msgTab === "whatsapp" ? " is-active" : ""}"
+                role="tab" aria-selected="${msgTab === "whatsapp"}"
+                data-action="switch-msg-tab" data-msg-tab="whatsapp">WhatsApp</button>
+        <button class="msg-tpl-pill${msgTab === "email" ? " is-active" : ""}"
+                role="tab" aria-selected="${msgTab === "email"}"
+                data-action="switch-msg-tab" data-msg-tab="email">Email</button>
+      </div>
+      <textarea class="notes-field msg-tpl-field"
+                data-template-field="${msgTab}"
+                aria-label="Modèle ${msgTab === "email" ? "Email" : "WhatsApp"}">${activeValue}</textarea>
+      <div class="msg-tpl-foot">
+        <button class="drawer-foot-btn msg-tpl-save${isDirty ? " is-dirty" : ""}"
+                data-action="save-msg-template">
+          ${icon.check()}<span>Enregistrer</span>
+        </button>
+      </div>
     </div>
     <p class="msg-hint">Le message par défaut s'ouvre dans l'application — modifiable avant l'envoi.</p>`;
 
@@ -6337,11 +6438,15 @@ function renderDrawer() {
       <div class="drawer-body" role="tabpanel">
         ${bodyByTab[activeTab]}
       </div>
+      ${activeTab === "infos" ? `
       <div class="drawer-foot">
-        ${isArchived(lead)
-          ? `<button class="drawer-foot-btn" data-action="restore-lead" data-lead-id="${lead.id}">${icon.rotateCcw()}<span>Restaurer le lead</span></button>`
-          : `<button class="drawer-foot-btn drawer-foot-btn--archive" data-action="archive-lead" data-lead-id="${lead.id}">${icon.archive()}<span>Archiver le lead</span></button>`}
-      </div>
+        <div class="drawer-foot-actions">
+          ${isArchived(lead)
+            ? `<button class="drawer-foot-btn" data-action="restore-lead" data-lead-id="${lead.id}">${icon.rotateCcw()}<span>Restaurer le lead</span></button>`
+            : `<button class="drawer-foot-btn drawer-foot-btn--archive" data-action="archive-lead" data-lead-id="${lead.id}">${icon.archive()}<span>Archiver le lead</span></button>`}
+        </div>
+        ${isMobile() ? `<div class="drawer-foot-legend">${renderIconLegend()}</div>` : ""}
+      </div>` : ""}
     </aside>
   `;
 }
@@ -6505,6 +6610,25 @@ document.addEventListener("click", (e) => {
     case "switch-drawer-tab": {
       const tab = target.getAttribute("data-tab");
       setState({ drawer: { ...state.drawer, tab } });
+      break;
+    }
+    case "switch-msg-tab": {
+      // v0.18.12 (ADR-0023) — swap which global template the Messages rapides
+      // field shows/edits. setState is fine here: this is a click, not a
+      // keystroke, so there's no textarea focus to preserve mid-typing.
+      const t = target.getAttribute("data-msg-tab");
+      const next = (t === "email") ? "email" : "whatsapp";
+      setState({ msgTab: next });
+      break;
+    }
+    case "save-msg-template": {
+      // v0.18.12 (ADR-0023) — persist the edited template into the saved
+      // snapshot (the dirty baseline; backend-shaped — this becomes a persist
+      // call when the V1 backend lands). state.messageTemplates already holds
+      // the live edited value (mutated silently on input); copy it into
+      // messageTemplatesSaved so the field reads clean. setState re-renders the
+      // tab, dropping the now-cleared dirty highlight.
+      setState({ messageTemplatesSaved: { ...state.messageTemplates } });
       break;
     }
     case "copy-email": {
@@ -6700,6 +6824,20 @@ document.addEventListener("click", (e) => {
       setState({ leads: nextLeads, selectedLeadIds: [], bulkMenu: null, leadsPage: 1 });
       break;
     }
+    case "bulk-archive": {
+      // v0.18.12 — archive every selected lead at once. Mirrors bulk-set-status's
+      // in-place loop + the single archive-lead mutation (archived=true,
+      // archivedAt=now). Non-destructive, so no confirm() (unlike bulk-delete).
+      // Archived leads drop out of every counter (the choke-point filters +
+      // explicit !isArchived guards, ADR-0022) and move to the Archives view.
+      // Selection clears on success; select mode stays on (matches bulk-delete).
+      if (state.selectedLeadIds.length === 0) break;
+      const ids = new Set(state.selectedLeadIds);
+      const now = new Date().toISOString();
+      state.leads.forEach(l => { if (ids.has(l.id)) { l.archived = true; l.archivedAt = now; } });
+      setState({ selectedLeadIds: [], bulkMenu: null, leadsPage: 1 });
+      break;
+    }
     case "toggle-filter-panel": {
       // v0.15 — open/close the Filters dropdown. Outside-click also closes it
       // (see the .leads-filter-wrap closer in the document click listener).
@@ -6832,6 +6970,26 @@ document.addEventListener("input", (e) => {
     return;
   }
 
+  // v0.18.12 (ADR-0023) — Messages rapides editable template. Same focus-safe
+  // pattern as Notes: mutate state.messageTemplates[tab] directly on each
+  // keystroke WITHOUT setState (a full re-render would drop the textarea focus
+  // mid-typing — the trap). The Enregistrer dirty highlight is a visual change
+  // we'd normally need a render for, so instead we toggle .is-dirty on the live
+  // button node directly — no setState, focus preserved. Save (a click) does
+  // the setState that re-renders the cleared state.
+  const tplEl = e.target.closest("[data-template-field]");
+  if (tplEl) {
+    const tab = tplEl.getAttribute("data-template-field");
+    if (state.messageTemplates && (tab === "whatsapp" || tab === "email")) {
+      state.messageTemplates[tab] = tplEl.value;
+      const saved = (state.messageTemplatesSaved || {})[tab];
+      const dirty = tplEl.value !== saved;
+      const saveBtn = document.querySelector("[data-action='save-msg-template']");
+      if (saveBtn) saveBtn.classList.toggle("is-dirty", dirty);
+    }
+    return;
+  }
+
   const target = e.target.closest("[data-action='filter-search']");
   if (!target) return;
   const value     = target.value;
@@ -6893,6 +7051,14 @@ window.addEventListener("resize", () => {
     if (state.drawer) render();
   }
 }, { passive: true });
+
+/* v0.18.12 (ADR-0023) — seed the editable global templates from the hardcoded
+   MSG_* constants (defined above this point, after the state literal). The
+   WhatsApp template and the Email BODY are editable; MSG_EMAIL_SUBJECT stays a
+   constant. Backend-shaped: when the V1 backend lands, this seed becomes a
+   load-from-store call and the save handler a persist call. */
+state.messageTemplates = { whatsapp: MSG_WHATSAPP, email: MSG_EMAIL_BODY };
+state.messageTemplatesSaved = { whatsapp: MSG_WHATSAPP, email: MSG_EMAIL_BODY };
 
 /* Initial render */
 render();
