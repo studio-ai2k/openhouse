@@ -1,5 +1,26 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.13
+  Drawer footer polish (cosmetic, mobile-sensitive) + documentation absorption.
+  Three footer items, no logic change: (A1) the mobile icon Légende now wraps
+  multiple-per-row (.icon-legend column→row+wrap) instead of stacking one-per-
+  row, so the footnote reads as a flat band; (A2) the footer is a more compact
+  band — .drawer-foot-legend top margin/padding tightened (18/14px→10/10px),
+  hairline kept; (A3) killed the dead space below the mobile footer — the
+  full-screen mobile drawer (100dvh, inset to 0) left its footer's last line
+  behind the iOS home-indicator / browser chrome because .drawer-foot had no
+  safe-area padding (the sidebar did, the footer didn't). Added
+  padding-bottom: calc(14px + env(safe-area-inset-bottom)) to the mobile
+  .drawer-foot only; the 100vh/100dvh height pair is left untouched
+  (deliberate progressive enhancement — 100vh is the no-dvh fallback). Docs:
+  recorded the form-template-registry decision (ADR-0026, not built — Ship 3
+  builds it; no form-templates/ folder or loadFormTemplates() yet, by design)
+  and the Magrey CSV schema-validation findings (docs/, verbatim; Paris-form
+  corrections RECORDED not applied — Ship 3 applies them). HANDOFF §4/§5 moved
+  to the three-ship sequence. Verified node --check (both files) +
+  matchMedia-shimmed jsdom full-render harness (desktop + mobile).
+  → ADR-0026: Form-template registry — shared, versioned, swappable loader.
+
   Open House Leads — v0.18.12
   Drawer + dashboard polish, one bulk action, and a Messages rapides product
   reversal — all on mock data, no backend. Six items: (1) dashboard breakdown
@@ -1608,11 +1629,11 @@
   }
   .drawer-foot-actions { display: flex; justify-content: flex-end; }
   .drawer-foot-legend {
-    margin-top: 18px;
-    padding-top: 14px;
+    margin-top: 10px;
+    padding-top: 10px;
     border-top: 1px solid var(--border-divider);
   }
-  .drawer-foot-legend .icon-legend { gap: 8px; }
+  .drawer-foot-legend .icon-legend { gap: 6px 16px; }
   .drawer-foot-legend .icon-legend-label { font-size: 12px; color: var(--text-muted); }
   .drawer-foot-btn {
     display: inline-flex; align-items: center; gap: 8px;
@@ -1828,9 +1849,12 @@
   .notes-field:focus { outline: none; border-color: var(--border-strong); }
   .notes-field::placeholder { color: var(--text-muted); }
 
-  /* v0.11.5 — mobile icon legend (last bloc of Infos tab on mobile) */
-  .icon-legend { display: flex; flex-direction: column; gap: 10px; }
-  .icon-legend-row { display: flex; align-items: center; gap: 12px; }
+  /* v0.11.5 — mobile icon legend (last bloc of Infos tab on mobile).
+     v0.18.13 — flat layout: the 4 icon+label pairs wrap multiple-per-row
+     instead of stacking one-per-row, so the footnote reads as a compact band.
+     .icon-legend-row stays the pair unit. */
+  .icon-legend { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px 16px; }
+  .icon-legend-row { display: flex; align-items: center; gap: 8px; }
   .icon-legend-row .attr-icon svg { width: 16px; height: 16px; }
   .icon-legend-label { font-size: 13px; color: var(--text-secondary); }
   .icon-legend-hint {
@@ -3354,6 +3378,17 @@
     }
     .drawer-tab { white-space: nowrap; }
     .drawer-body { padding: 16px; }
+    /* v0.18.13 — the mobile drawer is a full-screen takeover (100dvh, inset
+       to 0). The footer is the drawer's lowest flex child, so on iOS its last
+       line (the Légende footnote) sat behind the home-indicator / browser
+       chrome — read as "dead space below the footer." The sidebar already
+       clears the inset (its bottom padding includes env(safe-area-inset-bottom));
+       the footer never did. Add the inset to the footer's bottom padding so its
+       last visible line is the lowest visible pixel. Top/horizontal keep the
+       base 14px 24px. */
+    .drawer-foot {
+      padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    }
     /* On mobile: close button stays on the LEFT (native iOS/Android back pattern)
        and renders as a back-arrow. v0.14.0 — header is a column; the back-arrow
        leads the top row (order 0), then avatar, then name. */
@@ -3393,7 +3428,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.12";
+const APP_VERSION = "v0.18.13";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
