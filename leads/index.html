@@ -1,5 +1,57 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.11
+  The deferred 31-05 feature set, on mock data — frontend now V1-complete pending
+  the backend. Four items: (1) advanced combinable filters — Budget · Secteur ·
+  Timing join Score/Date/Statut, multi-select, AND across dimensions / OR within,
+  options derived from the live lead set (executes ADR-0009, no new ADR);
+  (2) filter-aware CSV export — exports exactly computeLeadsView().visible,
+  display labels, 11 French headers, RFC-4180 + UTF-8 BOM, Blob+anchor, no library
+  (ADR-0009); (3) two dashboard breakdowns — Type de projet + Top-5 caractéristiques,
+  count + % of total, reusing renderDistRow (extends the v0.18.9 relock, no ADR);
+  (4) archivage — isArchived(lead) excluded at every counter/list/breakdown (the
+  two choke points + nav/bell badges + option-builders), a live Archives nav item
+  + view with Restore, archive/restore from the drawer footer. New "database" icon
+  so the greyed Database slot stops colliding with Archives' "archive" icon. See
+  ADR-0022 + CHANGELOG v0.18.11. Verified node --check (both files) + a full-render
+  matchMedia-shimmed jsdom harness; the archivage invariant tested before/after
+  across all eleven counters (each drops by exactly 1; restore returns to baseline).
+
+  Open House Leads — v0.18.10
+  Docs-only ship (app code unchanged except APP_VERSION + this comment). Records
+  the questionnaire-template config decision (ADR-0021): structured columns /
+  filters / breakdowns are template-driven, matched by form_id → template
+  (deterministic lookup, not campaign-keyed, not answer-content-inferred);
+  structure-in-config + values-from-data; graceful fallback to a generic safe
+  view for unmapped forms. V1 = config-as-CODE in the repo layer (built when real
+  field_data is wired, NOT now); lifts to config-as-DATA in the V2 Espace Open
+  House admin UI. SCHEMA_SPEC annotates form_id as the template-matching key. No
+  app behaviour change. See CHANGELOG v0.18.10.
+
+  Open House Leads — v0.18.9
+  The 31-05 redirection — frontend code (executes ADR-0019 + ADR-0020). Four
+  steps in sequence: (1) score → priority axis — label/colour remap keeping the
+  hot/warm/cold/none keys (Chaud/Tiède/Froid → Prioritaire/Intéressant/Faible;
+  Prioritaire emphasised with a solid red fill); (2) status → 3 values, dropping
+  visite_prevue (seed ids 6/10/19/24 → contacte, 31 → a_contacter; visite_prevue
+  colour kept DORMANT); (3) table column reorder Date-first + email-under-name
+  removed (email stays in the drawer); (4) dashboard core redirect (ADR-0020) —
+  2 non-clickable KPIs + map + count/%-breakdowns; the clickable KPI row, the
+  réactivité tiles, the velocity deltas, and the Vue-rapide handoff removed and
+  parked DORMANT. Deferred (not built): export CSV, archivage, advanced filters,
+  the 2 new dashboard breakdowns, V2 items. See CHANGELOG v0.18.9.
+
+  Open House Leads — v0.18.8
+  Docs-only ship (app code unchanged except APP_VERSION + this comment). Absorbs
+  Greg's 31-05 redirection as a confirmed decision BEFORE any code edits (which
+  happen next, in a fresh session): ADR-0019 records the next-ship scope
+  (score → priority axis via label/colour remap keeping the hot/warm/cold/none
+  keys; status → 3 values dropping visite_prevue; column reorder + email removal;
+  dashboard core redirect to 2 non-clickable KPIs + map + %-breakdowns) and the
+  deferrals (export CSV, archivage, advanced filters, the 2 new dashboard
+  breakdowns). SCHEMA_SPEC updated with the score key→label mapping + status
+  reduction. No app behaviour change yet. See CHANGELOG v0.18.8.
+
   Open House Leads — v0.18.7
   Docs-only ship (app code unchanged except APP_VERSION + this comment). Records
   the multi-client architecture worked out in chat: ADR-0018 (deployment
@@ -1523,6 +1575,22 @@
     overflow-y: auto;
     background: var(--surface-tint);
   }
+  /* v0.18.11 (ADR-0022) — drawer footer holds the Archive (or Restore) action.
+     Pinned below the scrolling body, separated by a hairline. */
+  .drawer-foot {
+    padding: 14px 24px;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--panel);
+  }
+  .drawer-foot-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 38px; padding: 0 16px;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border-subtle); border-radius: 9px;
+    font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .drawer-foot-btn:hover { background: var(--surface-tint); }
+  .drawer-foot-btn--archive:hover { border-color: #C99A3E; color: #854F0B; }
 
   /* ── v0.11.2 — Centre d'action drawer body (3 tabs) ──────────────── */
   /* v0.14.0 — divider model (V1_SCOPE §2.3a): hairlines separate drawer
@@ -1877,7 +1945,7 @@
     color: var(--text-primary);
   }
 
-  /* Score chip — Chaud / Tiède / Froid. Colored dot + label inside a
+  /* Score chip — Prioritaire / Intéressant / Faible. Colored dot + label inside a
      tinted pill. Chosen so all three weights read at the same visual
      volume (no one chip shouts louder than another). */
   .score-chip {
@@ -1897,8 +1965,10 @@
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .score-chip--hot  { background: #FCEBEB; color: #A32D2D; }
-  .score-chip--hot  .score-chip-dot { background: #E24B4A; }
+  /* Prioritaire (key hot) — emphasised: solid red fill so the "act now" score
+     pops against the three wash-style chips. v0.18.9 (31-05 priority axis). */
+  .score-chip--hot  { background: #E24B4A; color: #FFFFFF; font-weight: 700; }
+  .score-chip--hot  .score-chip-dot { background: #FFFFFF; }
   .score-chip--warm { background: #FAEEDA; color: #854F0B; }
   .score-chip--warm .score-chip-dot { background: #F5B94C; }
   .score-chip--cold { background: #E6F1FB; color: #0C447C; }
@@ -1990,8 +2060,10 @@
   }
   .score-pill .score-pill-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .score-pill svg { width: 13px; height: 13px; opacity: 0.65; flex-shrink: 0; }
-  .score-pill--hot  { background: #FCEBEB; color: #A32D2D; }
-  .score-pill--hot  .score-chip-dot { background: #E24B4A; }
+  /* Prioritaire (key hot) — emphasised solid fill, matching the chip. */
+  .score-pill--hot  { background: #E24B4A; color: #FFFFFF; font-weight: 700; }
+  .score-pill--hot  .score-chip-dot { background: #FFFFFF; }
+  .score-pill--hot  svg { opacity: 0.9; }
   .score-pill--warm { background: #FAEEDA; color: #854F0B; }
   .score-pill--warm .score-chip-dot { background: #F5B94C; }
   .score-pill--cold { background: #E6F1FB; color: #0C447C; }
@@ -2056,6 +2128,44 @@
     border: 1px solid var(--border-subtle);
     border-radius: 16px;
     overflow: hidden;
+  }
+  /* v0.18.11 (ADR-0022) — Archives view. Reuses the table-card shell; its own
+     4-col grid (Nom · Secteur · Archivé le · Restaurer). Collapses on mobile. */
+  .archives-intro { margin-bottom: 16px; }
+  .archives-title { font-size: 20px; font-weight: 700; color: var(--text-strong); }
+  .archives-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .archives-head, .archives-row {
+    display: grid;
+    grid-template-columns: 2fr 1.4fr 1fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 22px;
+  }
+  .archives-head {
+    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .archives-row { border-bottom: 1px solid var(--border-subtle); }
+  .archives-row:last-child { border-bottom: none; }
+  .archives-col--nom { display: flex; align-items: center; gap: 10px; }
+  .archives-row-name { font-weight: 600; color: var(--text-strong); }
+  .archives-col--secteur, .archives-col--date { font-size: 14px; color: var(--text); }
+  .archives-col--action { justify-self: end; }
+  .archives-empty { padding: 40px 22px; text-align: center; }
+  .archives-empty-title { font-size: 16px; font-weight: 600; color: var(--text-strong); }
+  .archives-empty-body { font-size: 13px; color: var(--text-muted); margin-top: 6px; max-width: 420px; margin-left: auto; margin-right: auto; }
+  @media (max-width: 768px) {
+    .archives-head { display: none; }
+    .archives-row {
+      grid-template-columns: 1fr auto;
+      grid-template-areas: "nom action" "secteur action" "date action";
+      row-gap: 4px;
+    }
+    .archives-col--nom     { grid-area: nom; }
+    .archives-col--secteur { grid-area: secteur; font-size: 13px; color: var(--text-muted); }
+    .archives-col--date    { grid-area: date; font-size: 13px; color: var(--text-muted); }
+    .archives-col--action  { grid-area: action; align-self: center; }
   }
   .leads-table-header {
     padding: 16px 22px;
@@ -2249,13 +2359,13 @@
   .leads-row {
     display: grid;
     grid-template-columns:
-      minmax(170px, 2.1fr)  /* Nom (avatar + name + email)   */
+      minmax(86px,  0.9fr)  /* Date                           */
+      minmax(170px, 2.1fr)  /* Nom (avatar + name)            */
       minmax(92px,  0.9fr)  /* Budget (tag)                   */
       minmax(130px, 1.2fr)  /* Secteur                        */
       minmax(150px, 1.3fr)  /* Timing                         */
       minmax(124px, 1.15fr) /* Statut (inline dropdown)       */
-      minmax(86px,  0.85fr) /* Score chip                     */
-      minmax(86px,  0.9fr); /* Date                           */
+      minmax(86px,  0.85fr);/* Score chip                     */
     gap: 14px;
     align-items: center;
   }
@@ -2265,13 +2375,13 @@
   .leads-table-body--selectable .leads-row {
     grid-template-columns:
       44px                  /* Checkbox (fixed width)        */
-      minmax(170px, 2.1fr)
-      minmax(92px,  0.9fr)
-      minmax(130px, 1.2fr)
-      minmax(150px, 1.3fr)
+      minmax(86px,  0.9fr)  /* Date                           */
+      minmax(170px, 2.1fr)  /* Nom                            */
+      minmax(92px,  0.9fr)  /* Budget                         */
+      minmax(130px, 1.2fr)  /* Secteur                        */
+      minmax(150px, 1.3fr)  /* Timing                         */
       minmax(124px, 1.15fr) /* Statut                         */
-      minmax(86px,  0.85fr)
-      minmax(86px,  0.9fr);
+      minmax(86px,  0.85fr);/* Score                          */
   }
   .leads-table-head {
     padding: 12px 22px 10px;
@@ -2391,6 +2501,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  /* DORMANT in V1 (v0.18.9, 31-05 redirect): the email line under the name was
+     removed from renderLeadRow — email now lives in the drawer only. Style hook
+     kept for a possible V2 re-add. */
   .leads-col-nom-email {
     font-size: 12px;
     color: var(--text-muted);
@@ -2895,14 +3008,22 @@
   .dash-hint {
     font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-muted);
   }
+  /* v0.18.11 — fallback note for the Top-5 caractéristiques breakdown when no
+     features are present in the scoped set (defensive; never hit with the V1 seed). */
+  .dash-empty-note {
+    font-size: 13px; color: var(--text-muted); padding: 8px 2px;
+  }
 
   /* Bloc 1 — KPI cards */
   .dash-kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .dash-kpi-row--single { grid-template-columns: 1fr; }
+  .dash-kpi-row--single { grid-template-columns: 1fr; } /* DORMANT (ADR-0020): old single-period Bloc1 */
   .dash-kpi {
     background: var(--surface-tint); border: 1px solid var(--border-subtle);
     border-radius: var(--r-md); padding: 18px 20px;
   }
+  /* DORMANT (v0.18.9, ADR-0020): .dash-kpi-top / .dash-kpi-w styled the removed
+     clickable Vue-globale KPIs (delta pill + rolling-window note). Kept for a
+     Phase-2 re-add alongside the dormant renderDashBloc1 layout. */
   .dash-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
   .dash-kpi-n {
     font-family: var(--font-mono); font-size: 40px; font-weight: 600;
@@ -2910,6 +3031,18 @@
   }
   .dash-kpi-l { font-size: 14px; font-weight: 600; color: var(--text-primary); }
   .dash-kpi-w { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+  /* v0.18.9 (ADR-0020) — static 2-KPI header (non-clickable, no delta). */
+  .dash-kpi-row--static { grid-template-columns: 1fr 1fr; }
+  .dash-kpi--static .dash-kpi-n { margin-bottom: 8px; }
+  /* % of total, shown after the count on breakdown rows (ADR-0020). */
+  .dash-bar-pct {
+    margin-left: 8px; font-size: 12px; font-weight: 500;
+    color: var(--text-muted); font-variant-numeric: tabular-nums;
+  }
+  .dash-fact-pct {
+    margin-left: 7px; font-size: 11.5px; font-weight: 500;
+    color: var(--text-muted); font-variant-numeric: tabular-nums;
+  }
   .dash-delta {
     display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono);
     font-size: 12.5px; font-weight: 600; padding: 4px 9px; border-radius: var(--r-pill);
@@ -3204,7 +3337,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.7";
+const APP_VERSION = "v0.18.11";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -3221,18 +3354,22 @@ const SCORE_CYCLE  = ["hot", "warm", "cold"];  // DORMANT in V1 (v0.15) — drov
 // qualification encore faite", Greg brief Update 26-05 (2)). Drives set-score
 // validation; "none" is a real, selectable, grey state, not just a fallback.
 const SCORE_VALUES = ["none", "hot", "warm", "cold"];
+// v0.18.11 — score key → display label (priority axis, 31-05 remap, ADR-0019).
+// Keys stay hot/warm/cold/none internally (renamed at backend-schema time);
+// this is the single label source for the CSV export + any non-cell display.
+const SCORE_LABELS = { hot: "Prioritaire", warm: "Intéressant", cold: "Faible", none: "Non évalué" };
+function scoreLabel(score) { return SCORE_LABELS[score] || SCORE_LABELS.none; }
 // v0.15 — pagination page size (Greg brief Update 26-05 (2): 20/page, no
 // infinite scroll). The view is paginated by slicing computeLeadsView's
 // already-sorted/searched/filtered list, so filters + (future) export all
 // operate on the same "current view".
 const PAGE_SIZE = 20;
 const TIMING_ORDER = { "Immédiatement": 3, "Dans les 6 prochains mois": 2, "Plus de 6 mois": 1 };
-// v0.18 — Réactivité bloc aging threshold (ADR-0013). A lead still in Nouveau
-// older than this many days is flagged "En Nouveau depuis +Nj". Greg-confirmed
-// value goes here; Claude's brainstorm guess was 3d (real-estate first-contact
-// practice is usually <24h, ideal 2-4h, so Magrey may want 24h/48h). Per-tenant
-// configurable in Phase 2; one hardcoded value for V1. Drives both the tile
-// count and the matching Vue rapide chip so the dashboard→Leads handoff is exact.
+// DORMANT in V1 (v0.18.9, ADR-0020): aging threshold (ADR-0013) drove the "En
+// Nouveau depuis +Nj" priority tile + its Vue-rapide chip, both removed in the
+// 31-05 dashboard redirect. The const stays referenced by the dormant priorities
+// chain (kept for a Phase-2 re-add); not surfaced anywhere live. Greg-confirmed
+// value 3d; per-tenant configurable in Phase 2.
 const AGING_THRESHOLD_DAYS = 3;
 /* Terse Timing labels for the dense desktop scan column (data value is kept
    full per Greg's form wording; only the display is shortened). */
@@ -3267,7 +3404,6 @@ const state = {
         { id: "nouveau",       label: "Nouveau" },
         { id: "a_contacter",   label: "À contacter" },
         { id: "contacte",      label: "Contacté" },
-        { id: "visite_prevue", label: "Visite prévue" },
       ],
       seller: [
         { id: "to_process",      label: "À traiter" },
@@ -3289,7 +3425,7 @@ const state = {
   },
 
   // nav — active route
-  route: "leads",  // "leads" | "dashboard" | "agents" | "campaigns" | "database" | "settings" | "help"
+  route: "leads",  // "leads" | "dashboard" | "archives" | "agents" | "campaigns" | "database" | "settings" | "help"
 
   // v0.18 — Tableau de bord page-level filters (ADR-0012). Both scope every
   // bloc. periode presets match the Leads Filters panel exactly so the date
@@ -3343,9 +3479,11 @@ const state = {
   leadsPage: 1,
   // v0.15 — Filters panel (Greg brief: filters pulled into V1, BRIEF_STATE §5).
   // Statut is driven by `filterTab` (shared with the stage cards — one source of
-  // truth); Score + Date are the new dimensions, applied on top in
-  // computeLeadsView. date ∈ null | "today" | "7d" | "30d" | "month".
-  filters: { score: [], date: null },
+  // truth); Score · Date · Budget · Secteur · Timing are the panel dimensions,
+  // applied on top in computeLeadsView. date ∈ null | "today" | "7d" | "30d" |
+  // "month". budget/secteur/timing are multi-select arrays (OR within a
+  // dimension, AND across dimensions), same shape as score (v0.18.11, ADR-0009 + CHANGELOG).
+  filters: { score: [], date: null, budget: [], secteur: [], timing: [] },
   filterPanelOpen: false,
   // Bulk-select mode (v0.9.0). selectionMode toggles the checkbox column on.
   // selectedLeadIds persists across filter changes — the intent is "act on these",
@@ -3421,7 +3559,7 @@ const state = {
       ] },
     { id: 5,  type: "buyer", initials: "CR", tone: "#F97316", name: "Camille Rousseau",     email: "camille.r@icloud.com",   phone: "+33 7 34 56 78 90", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 8e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre", contactPreference: "Dans un mois",        features: ["Vue dégagée"], status: "a_contacter",     score: "warm", source: "ig",     assignedAgentId: null, campaign: "Prestige Madeleine", createdAt: daysAgoISO(0, 15, 22), notes: "Investissement locatif. Cherche rentabilité > 4%.",
       activity: [] },
-    { id: 6,  type: "buyer", initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "visite_prevue",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e", createdAt: daysAgoISO(3, 21, 8),  notes: "Visite prévue mercredi 14h.",
+    { id: 6,  type: "buyer", initials: "AB", tone: "#EF4444", name: "Antoine Bernard",      email: "a.bernard@yahoo.fr",     phone: "+33 6 45 67 89 01", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "contacte",  score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 17e", createdAt: daysAgoISO(3, 21, 8),  notes: "Visite prévue mercredi 14h.",
       activity: [
         { type: "call",  at: "2026-04-05T11:00:00Z", by: 3 },
         { type: "email", at: "2026-04-06T16:20:00Z", by: 3 },
@@ -3441,7 +3579,7 @@ const state = {
       activity: [
         { type: "call", at: "2026-04-08T19:15:00Z", by: null },
       ] },
-    { id: 10, type: "buyer", initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "visite_prevue",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(5, 10, 12), notes: "Recherche hôtel particulier. Offre transmise mardi.",
+    { id: 10, type: "buyer", initials: "FD", tone: "#E11D48", name: "François Dubois",      email: "fdubois@wanadoo.fr",     phone: "+33 6 89 01 23 45", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite", features: ["Style haussmannien", "Vue dégagée"], status: "contacte",     score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(5, 10, 12), notes: "Recherche hôtel particulier. Offre transmise mardi.",
       activity: [
         { type: "call",     at: "2026-04-07T09:30:00Z", by: 3 },
         { type: "email",    at: "2026-04-08T11:00:00Z", by: 3 },
@@ -3458,19 +3596,19 @@ const state = {
     { id: 16, type: "buyer", initials: "KB", tone: "#EF4444", name: "Karim Benali",        email: "k.benali@gmail.com",       phone: "+33 6 44 55 66 77", phoneVerified: true,  budget: "2M–4M",      secteur: "Rive droite ouest",  zone: "Paris 8e",  timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "contacte",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Madeleine",  createdAt: daysAgoISO(4, 11, 18), notes: "Très motivé, dispo cette semaine." },
     { id: 17, type: "buyer", initials: "ED", tone: "#6366F1", name: "Élodie Dumas",        email: "elodie.d@icloud.com",      phone: "+33 7 55 66 77 88", phoneVerified: false, budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 6e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Pas pour le moment", features: ["Architecture contemporaine signée"],          status: "nouveau",       score: "none", source: "ig",     assignedAgentId: null, campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(1, 16, 30), notes: "" },
     { id: 18, type: "buyer", initials: "VM", tone: "#F97316", name: "Vincent Marchand",    email: "v.marchand@yahoo.fr",      phone: "+33 6 66 77 88 99", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite centre", zone: "Paris 4e",  timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "cold", source: "fb",     assignedAgentId: null, campaign: "Le Marais Prestige", createdAt: daysAgoISO(6, 10, 0),  notes: "Budget serré, à recontacter." },
-    { id: 19, type: "buyer", initials: "CL", tone: "#10B981", name: "Claire Lemoine",      email: "claire.lemoine@gmail.com", phone: "+33 7 77 88 99 00", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "visite_prevue", score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(3, 13, 22), notes: "Visite programmée jeudi." },
+    { id: 19, type: "buyer", initials: "CL", tone: "#10B981", name: "Claire Lemoine",      email: "claire.lemoine@gmail.com", phone: "+33 7 77 88 99 00", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "contacte", score: "hot",  source: "ig",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(3, 13, 22), notes: "Visite programmée jeudi." },
     { id: 20, type: "buyer", initials: "HP", tone: "#8B5CF6", name: "Hugo Petit",          email: "hugo.petit@outlook.fr",    phone: "+33 6 88 99 00 11", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Dans un mois",      features: ["Vue dégagée"],                                 status: "contacte",      score: "warm", source: "fb",     assignedAgentId: 2,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(10, 9, 15), notes: "" },
     { id: 21, type: "buyer", initials: "NB", tone: "#E11D48", name: "Nora Brunel",         email: "nora.brunel@gmail.com",    phone: "+33 7 99 00 11 22", phoneVerified: false, budget: "2M–4M",      secteur: "Rive droite ouest",  zone: "Paris 17e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien"],                          status: "nouveau",       score: "none", source: "ig",     assignedAgentId: null, campaign: "Prestige Paris 17e", createdAt: daysAgoISO(0, 17, 50), notes: "" },
     { id: 22, type: "buyer", initials: "OG", tone: "#0EA5E9", name: "Olivier Garnier",     email: "o.garnier@free.fr",        phone: "+33 6 10 20 30 40", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite centre", zone: "Paris 11e", timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "hot",  source: "ig",     assignedAgentId: null, campaign: "Le Marais Prestige", createdAt: daysAgoISO(12, 8, 5),  notes: "Rappeler en fin de journée." },
     { id: 23, type: "buyer", initials: "MJ", tone: "#A855F7", name: "Manon Joubert",       email: "manon.joubert@icloud.com", phone: "+33 7 20 30 40 50", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 5e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Pas pour le moment", features: ["Architecture contemporaine signée", "Autre"], status: "contacte",      score: "cold", source: "ig",     assignedAgentId: 1,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(18, 11, 30), notes: "" },
-    { id: 24, type: "buyer", initials: "RF", tone: "#14B8A6", name: "Raphaël Faure",       email: "r.faure@gmail.com",        phone: "+33 6 30 40 50 60", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "visite_prevue", score: "warm", source: "fb",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(8, 15, 0),  notes: "Couple, premier achat haut de gamme." },
+    { id: 24, type: "buyer", initials: "RF", tone: "#14B8A6", name: "Raphaël Faure",       email: "r.faure@gmail.com",        phone: "+33 6 30 40 50 60", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "contacte", score: "warm", source: "fb",     assignedAgentId: 3,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(8, 15, 0),  notes: "Couple, premier achat haut de gamme." },
     { id: 25, type: "buyer", initials: "LC", tone: "#6366F1", name: "Léa Chevalier",       email: "lea.chevalier@yahoo.fr",   phone: "+33 7 40 50 60 70", phoneVerified: false, budget: "2M–4M",      secteur: "Rive droite centre", zone: "Paris 2e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Dans un mois",      features: ["Vue dégagée"],                                 status: "nouveau",       score: "none", source: "ig",     assignedAgentId: null, campaign: "Le Marais Prestige",  createdAt: daysAgoISO(25, 10, 45), notes: "" },
     { id: 26, type: "buyer", initials: "AM", tone: "#F97316", name: "Adrien Masson",       email: "a.masson@outlook.fr",      phone: "+33 6 50 60 70 80", phoneVerified: true,  budget: "Moins de 1M", secteur: "Rive droite ouest",  zone: "Boulogne",  timeline: "Plus de 6 mois",            projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Autre"],                                       status: "a_contacter",   score: "warm", source: "fb",     assignedAgentId: null, campaign: "Boulogne Actifs",    createdAt: daysAgoISO(5, 18, 20), notes: "" },
     { id: 27, type: "buyer", initials: "ZD", tone: "#10B981", name: "Zoé Delaunay",        email: "zoe.delaunay@gmail.com",   phone: "+33 7 60 70 80 90", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 6e",  timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien"],                          status: "contacte",      score: "hot",  source: "ig",     assignedAgentId: 2,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(15, 9, 10), notes: "Cherche du calme, étage élevé." },
     { id: 28, type: "buyer", initials: "BT", tone: "#8B5CF6", name: "Benjamin Tessier",    email: "b.tessier@free.fr",        phone: "+33 6 70 80 90 01", phoneVerified: false, budget: "Moins de 1M", secteur: "Rive droite centre", zone: "Paris 10e", timeline: "Plus de 6 mois",            projectType: "Pied-à-terre",         contactPreference: "Pas pour le moment", features: ["Autre"],                                       status: "nouveau",       score: "cold", source: "fb",     assignedAgentId: null, campaign: "Le Marais Prestige", createdAt: daysAgoISO(28, 12, 0), notes: "" },
     { id: 29, type: "buyer", initials: "IF", tone: "#E11D48", name: "Inès Faivre",         email: "ines.faivre@icloud.com",   phone: "+33 7 80 90 01 12", phoneVerified: true,  budget: "2M–4M",      secteur: "Rive droite ouest",  zone: "Neuilly",   timeline: "Dans les 6 prochains mois", projectType: "Résidence principale", contactPreference: "Dans un mois",      features: ["Vue dégagée", "Style haussmannien"],           status: "a_contacter",   score: "warm", source: "fb",     assignedAgentId: null, campaign: "Neuilly Familles",   createdAt: daysAgoISO(40, 14, 30), notes: "Lead plus ancien, relance à prévoir." },
     { id: 30, type: "buyer", initials: "GP", tone: "#0EA5E9", name: "Gabriel Perrot",      email: "g.perrot@gmail.com",       phone: "+33 6 90 01 12 23", phoneVerified: true,  budget: "4M+",        secteur: "Rive droite ouest",  zone: "Paris 16e", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Style haussmannien", "Vue dégagée"],           status: "contacte",      score: "hot",  source: "ig",     assignedAgentId: 1,    campaign: "Prestige Paris 16e", createdAt: daysAgoISO(55, 10, 0), notes: "Recherche pied-à-terre familial." },
-    { id: 31, type: "buyer", initials: "MD", tone: "#A855F7", name: "Margaux Didier",      email: "m.didier@outlook.fr",      phone: "+33 7 01 12 23 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Dans un mois",      features: ["Architecture contemporaine signée"],          status: "visite_prevue", score: "warm", source: "ig",     assignedAgentId: 3,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(9, 16, 45), notes: "" },
+    { id: 31, type: "buyer", initials: "MD", tone: "#A855F7", name: "Margaux Didier",      email: "m.didier@outlook.fr",      phone: "+33 7 01 12 23 34", phoneVerified: true,  budget: "1M–2M",      secteur: "Rive gauche",        zone: "Paris 7e",  timeline: "Dans les 6 prochains mois", projectType: "Pied-à-terre",         contactPreference: "Dans un mois",      features: ["Architecture contemporaine signée"],          status: "a_contacter", score: "warm", source: "ig",     assignedAgentId: 3,    campaign: "Luxe Rive Gauche",   createdAt: daysAgoISO(9, 16, 45), notes: "" },
     { id: 32, type: "buyer", initials: "YL", tone: "#14B8A6", name: "Yanis Leroy",         email: "yanis.leroy@gmail.com",    phone: "+33 6 12 23 34 45", phoneVerified: false, budget: "2M–4M",      secteur: "Rive droite centre", zone: "Paris 1er", timeline: "Immédiatement",            projectType: "Résidence principale", contactPreference: "Tout de suite",     features: ["Vue dégagée"],                                 status: "nouveau",       score: "none", source: "fb",     assignedAgentId: null, campaign: "Le Marais Prestige",  createdAt: daysAgoISO(2, 19, 5),  notes: "" },
     { id: 11, type: "seller", initials: "CV", tone: "#F59E0B", name: "Christine Vidal",      email: "c.vidal@orange.fr",      phone: "+33 6 90 12 34 56", phoneVerified: true,  surface: 85,  rooms: 4, expectedPrice: "1 150 000 €", condition: "Bon état",      zone: "Paris 6e",           sellingTimeline: "3–6 mois", status: "estimation_sent", score: "warm", source: "ig",     assignedAgentId: 1,    campaign: "Estimation Rive Gauche", createdAt: "2026-04-06T16:35:00Z", notes: "Propriétaire depuis 12 ans. Souhaite aussi acheter après vente.",
       activity: [
@@ -3508,7 +3646,7 @@ function applyVueRapide(chip) {
     route: "leads",
     leadType: "buyer",
     filterTab: "all",
-    filters: { score: [], date: null },
+    filters: { score: [], date: null, budget: [], secteur: [], timing: [] },
     leadsSearch: "",
     vueRapide: chips,
     leadsPage: 1,
@@ -3600,10 +3738,12 @@ function stageColors(stageId) {
   // fg   = mid-saturation color (icon stroke, active-state label/accent)
   // deep = dark variant for bold text on the tinted surface (active card's count)
   return {
-    // Buyer pipeline (v0.13.0 — Greg's 4-stage funnel)
+    // Buyer pipeline (v0.18.9 — 31-05 redirect: 3 forward stages, ADR-0019)
     nouveau:         { bg: "#EEEEF1", fg: "#8A8780", deep: "#4A4843" },  // grey — never treated (Greg brief Update 26-05 (2))
     a_contacter:     { bg: "#FBF0DC", fg: "#8C5A08", deep: "#5A3A05" },  // amber — needs a call
     contacte:        { bg: "#EDE7FF", fg: "#6D48DB", deep: "#3E2595" },  // violet — in motion
+    // visite_prevue — DORMANT in V1 (dropped from the funnel at v0.18.9, ADR-0019,
+    // reverses ADR-0005). Colour kept so any un-migrated data still renders.
     visite_prevue:   { bg: "#E4F4E9", fg: "#2F9D6F", deep: "#15653E" },  // green — progressing
     // Legacy buyer ids (dormant — kept so any un-migrated data still colours)
     to_process:      { bg: "#E8ECFF", fg: "#5B6DFF", deep: "#2A3AB8" },  // blue — fresh
@@ -3633,6 +3773,13 @@ function leadPrice(lead) {
 function leadTimeline(lead) {
   return lead.type === "seller" ? lead.sellingTimeline : lead.timeline;
 }
+
+/* v0.18.11 (ADR-0022) — archivage. A lead carries archived (bool) + archivedAt
+   (ISO|null); both default at READ time so the seed rows stay untouched (absent
+   = not archived). isArchived is the single predicate every counter / list /
+   breakdown filters on, so the "archived excluded everywhere" invariant has one
+   source of truth. The Archives view inverts it; archive/restore set the fields. */
+function isArchived(lead) { return !!lead.archived; }
 
 /* French formatter for the ISO createdAt field. Stored ISO (sortable),
    displayed French. When the backend lands and real timestamps come
@@ -3711,7 +3858,7 @@ const SCORE_ORDER = { hot: 3, warm: 2, cold: 1 };
 function leadScoreOrder(lead) { return SCORE_ORDER[lead.score] || 0; }
 // v0.13.0 — forward order of the 4 buyer stages, + Perdu last. Drives the
 // Statut column sort. Stage ids that aren't in the funnel fall back to 0.
-const STATUS_ORDER = { nouveau: 1, a_contacter: 2, contacte: 3, visite_prevue: 4, lost: 5 };
+const STATUS_ORDER = { nouveau: 1, a_contacter: 2, contacte: 3, lost: 5 };
 function leadStatusOrder(lead) { return STATUS_ORDER[lead.status] || 0; }
 
 /* Agent name lookup for sort. Unassigned leads sort as empty string (top in
@@ -3768,7 +3915,8 @@ const icon = {
   barChart:    () => svg(`<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/>`),
   users:       () => svg(`<path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>`),
   megaphone:   () => svg(`<path d="M3 11v2a4 4 0 004 4h1l5 4V3L8 7H7a4 4 0 00-4 4z"/><path d="M18 8v8"/><path d="M21 10v4"/>`),
-  archive:     () => svg(`<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8"/><path d="M10 12h4"/>`),  /* reserved for V2 (ex-bulk Archiver, ADR-0011) */
+  archive:     () => svg(`<rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 001 1h12a1 1 0 001-1V8"/><path d="M10 12h4"/>`),  /* v0.18.11: live — Archives nav item (ADR-0022) */
+  database:    () => svg(`<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/>`),  /* greyed "Bientôt" (V2) */
   settings:    () => svg(`<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>`),
 
   // Stage-card icons (Step 2 Layer 2)
@@ -3787,6 +3935,8 @@ const icon = {
   arrowDown:   () => svg(`<path d="M19 12l-7 7-7-7"/><path d="M12 5v14"/>`),
   chevronsUpDown: () => svg(`<path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/>`),
   trash:       () => svg(`<path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>`),
+  download:    () => svg(`<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`),
+  rotateCcw:   () => svg(`<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>`),  /* v0.18.11: restore (Archives, ADR-0022) */
   userCheck:   () => svg(`<path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>`),  /* reserved for V2 (ex-bulk Assigner, ADR-0011) */
 
   // Source icons (drawer header, future Filter popover). Lucide-style
@@ -3828,9 +3978,10 @@ const navGroups = [
       // build once Leads is ready, so it routes to the placeholder again.
       { id: "leads",     label: "Leads",          icon: "home" },
       { id: "dashboard", label: "Tableau de bord", icon: "barChart" },
+      { id: "archives",  label: "Archives",       icon: "archive" },
       { id: "agents",    label: "Agents",         icon: "users",     soon: true },
       { id: "campaigns", label: "Campagnes",      icon: "megaphone", soon: true },
-      { id: "database",  label: "Database",       icon: "archive",   soon: true },
+      { id: "database",  label: "Database",       icon: "database",  soon: true },
     ],
   },
   {
@@ -3920,7 +4071,9 @@ function renderAgencyMenu(agency) {
 
 function buyerLeadCount() {
   // V1 shows buyer leads only; badge reflects the live count (was hardcoded 24).
-  return state.leads.filter(l => l.type === "buyer").length;
+  // v0.18.11 (ADR-0022): archived leads aren't in the Leads list, so they're
+  // not in the badge either.
+  return state.leads.filter(l => l.type === "buyer" && !isArchived(l)).length;
 }
 
 function renderNavItem(item, active) {
@@ -4101,8 +4254,9 @@ function renderTopbar() {
             // live off state — no hardcoded count. The "new leads since last
             // seen" semantics (clearable badge) needs a seenAt/lastViewed field
             // + backend persistence; that lands with the V1.5 backend. The bell
-            // is display-only in V1 (no data-action).
-            const newCount = state.leads.filter(l => l.type === "buyer" && l.status === "nouveau").length;
+            // is display-only in V1 (no data-action). v0.18.11 (ADR-0022):
+            // archived leads are off the Leads surface, so they're not counted.
+            const newCount = state.leads.filter(l => l.type === "buyer" && l.status === "nouveau" && !isArchived(l)).length;
             return `<button class="icon-btn" aria-label="${newCount} nouveau${newCount > 1 ? "x" : ""} lead${newCount > 1 ? "s" : ""}" title="${newCount} lead${newCount > 1 ? "s" : ""} en Nouveau">
             ${icon.bell()}
             ${newCount > 0 ? `<span class="notif-badge">${newCount}</span>` : ""}
@@ -4139,14 +4293,20 @@ function computeLeadsView() {
   const search   = state.leadsSearch.trim().toLowerCase();
 
   // Raw per-type totals (ignore search — context chip must read true volume).
+  // v0.18.11 (ADR-0022): archived leads are excluded everywhere on the Leads
+  // surface — they live only in the Archives view. So the context-chip totals
+  // exclude them too, matching the list below.
   const typeCounts = {
-    buyer:  state.leads.filter(l => l.type === "buyer").length,
-    seller: state.leads.filter(l => l.type === "seller").length,
+    buyer:  state.leads.filter(l => l.type === "buyer"  && !isArchived(l)).length,
+    seller: state.leads.filter(l => l.type === "seller" && !isArchived(l)).length,
   };
 
   // Apply type + search to get the set all tab/pipeline counts are based on.
+  // Archived excluded first (ADR-0022) — the single Leads-list choke point, so
+  // pagination, filters, export, and stage counts all inherit the exclusion.
   const baseFiltered = state.leads.filter(l => {
     if (l.type !== type) return false;
+    if (isArchived(l)) return false;
     if (!search) return true;
     const hay = `${l.name} ${l.email} ${l.zone || ""}`.toLowerCase();
     return hay.includes(search);
@@ -4190,8 +4350,15 @@ function computeLeadsView() {
   // v0.15 — Filters panel dimensions (Score · Date), layered on top of the
   // filterTab + search base. Statut filtering IS filterTab (shared with the
   // stage cards — one source of truth), so it isn't re-applied here.
-  const fScore = state.filters.score || [];
-  const fDate  = state.filters.date || null;
+  // v0.18.11 (ADR-0009) — Budget · Secteur · Timing added as multi-select
+  // dimensions. Each is OR within itself, AND across dimensions: e.g.
+  // {Prioritaire} + {Rive gauche} + {Immédiatement} shows only leads matching
+  // all three. Empty array = dimension inactive (passes everything).
+  const fScore   = state.filters.score   || [];
+  const fDate    = state.filters.date    || null;
+  const fBudget  = state.filters.budget  || [];
+  const fSecteur = state.filters.secteur || [];
+  const fTiming  = state.filters.timing  || [];
   const dateFloor = (() => {
     if (fDate !== "7d" && fDate !== "30d") return null;
     const d = new Date();
@@ -4205,6 +4372,9 @@ function computeLeadsView() {
       const s = SCORE_VALUES.includes(l.score) ? l.score : "none";  // unset/unknown → "none"
       if (!fScore.includes(s)) return false;
     }
+    if (fBudget.length  && !fBudget.includes(l.budget))            return false;
+    if (fSecteur.length && !fSecteur.includes(l.secteur))          return false;
+    if (fTiming.length  && !fTiming.includes(leadTimeline(l)))     return false;
     if (fDate) {
       if (!l.createdAt) return false;
       if (fDate === "today")      { if (l.createdAt.slice(0, 10) !== todayIso)     return false; }
@@ -4246,6 +4416,65 @@ function computeLeadsView() {
     leadsInType: baseFiltered,  // v0.9.2 — used by cross-cutting KPI card counts
     counts: { stageCounts, lostCount, totalFiltered: baseFiltered.length, typeCounts },
   };
+}
+
+/* v0.18.11 — filter-aware CSV export (executes ADR-0009's deferred export, paired
+   with the advanced filters; CHANGELOG-tracked, no new ADR). Exports EXACTLY the
+   currently-filtered+visible set — it reads computeLeadsView().visible, the same
+   list the table paginates, so it honours every active filter (and, once Item 3
+   archivage lands, the archived exclusion baked into computeLeadsView comes along
+   for free — no separate re-filter). Display labels, not internal keys (it's for
+   humans / a future Apimmo import): score → Prioritaire/…, statut → Nouveau/…,
+   timing → full form wording. No library (stack lock, no build step): build a
+   string, download via Blob + anchor. French headers (UI is French). A UTF-8 BOM
+   is prepended so Excel renders the accents (é, …) correctly. */
+const CSV_COLUMNS = [
+  { header: "Prénom / Nom",        get: l => l.name },
+  { header: "Email",              get: l => l.email },
+  { header: "Téléphone",          get: l => l.phone },
+  { header: "Secteur recherché",  get: l => l.secteur },
+  { header: "Timing",             get: l => leadTimeline(l) },
+  { header: "Budget",             get: l => l.budget },
+  { header: "Caractéristiques",   get: l => (l.features || []).join(" · ") },
+  { header: "Score",              get: l => scoreLabel(l.score) },
+  { header: "Statut",             get: l => stageLabel(l.type, l.status) },
+  { header: "Date du lead",       get: l => formatLeadDateHuman(l.createdAt) },
+  { header: "Notes",              get: l => l.notes },
+];
+
+function csvEscape(value) {
+  // RFC 4180: wrap in double-quotes when the field contains a comma, quote,
+  // or newline; escape embedded quotes by doubling them. Always quoting is
+  // also valid and simpler — do that, so French free-text notes are safe.
+  const s = (value == null ? "" : String(value));
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function buildLeadsCsv(leads) {
+  const head = CSV_COLUMNS.map(c => csvEscape(c.header)).join(",");
+  const rows = leads.map(l => CSV_COLUMNS.map(c => csvEscape(c.get(l))).join(","));
+  return [head, ...rows].join("\r\n");
+}
+
+function exportLeadsCsv() {
+  const view = computeLeadsView();           // the current filtered/sorted set
+  const leads = view.visible;
+  const csv = "\uFEFF" + buildLeadsCsv(leads);  // BOM for Excel UTF-8
+  const stamp = new Date().toISOString().slice(0, 10);  // YYYY-MM-DD
+  const filename = `leads-openhouse-${stamp}.csv`;
+  try {
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  } catch (e) {
+    // Blob/URL unavailable (very old browser) — silent no-op; demo-acceptable.
+  }
 }
 
 /* v0.10.3 — Leads mode card (V11). One card visually split into two
@@ -4496,14 +4725,14 @@ function renderStageCards(pipeline, stageCounts, activeStage, typeKey, allLeads)
    kept in-file for reference / possible V2 reuse. */
 function renderScoreChip(score, leadId) {
   const map = {
-    hot:  { label: "Chaud", mod: "hot"  },
-    warm: { label: "Tiède", mod: "warm" },
-    cold: { label: "Froid", mod: "cold" },
+    hot:  { label: "Prioritaire", mod: "hot"  },
+    warm: { label: "Intéressant", mod: "warm" },
+    cold: { label: "Faible", mod: "cold" },
   };
   const m = map[score] || { label: score || "—", mod: "none" };
   const inner = `<span class="score-chip-dot"></span>${m.label}`;
   // V1: when a leadId is passed, the chip is a click-to-cycle control
-  // (Chaud→Tiède→Froid), editable straight from the table/card. No modal,
+  // (Prioritaire→Intéressant→Faible), editable straight from the table/card. No modal,
   // no save step — setState mutates the lead. The score IS the qualification.
   if (leadId != null) {
     return `<button class="score-chip score-chip--${m.mod} score-chip--editable" data-action="cycle-score" data-lead-id="${leadId}" title="Cliquer pour changer le score" aria-label="Score : ${m.label}. Cliquer pour changer.">${inner}</button>`;
@@ -4511,7 +4740,7 @@ function renderScoreChip(score, leadId) {
   return `<span class="score-chip score-chip--${m.mod}">${inner}</span>`;
 }
 
-/* Score dropdown control — coloured pill + instant menu (Chaud/Tiède/Froid),
+/* Score dropdown control — coloured pill + instant menu (Prioritaire/Intéressant/Faible),
    mirroring renderStatusCell. Used on the drawer header qualification line so
    Statut and Score read as one dropdown family. Reuses the set-score handler
    (same lead.score field as the table's click-to-cycle, so they stay in sync);
@@ -4519,18 +4748,18 @@ function renderScoreChip(score, leadId) {
 function renderScoreCell(lead, opts = {}) {
   const surface = opts.surface || "row";
   const map = {
-    hot:  { label: "Chaud", mod: "hot"  },
-    warm: { label: "Tiède", mod: "warm" },
-    cold: { label: "Froid", mod: "cold" },
+    hot:  { label: "Prioritaire", mod: "hot"  },
+    warm: { label: "Intéressant", mod: "warm" },
+    cold: { label: "Faible", mod: "cold" },
     none: { label: "Non évalué", mod: "none" },
   };
   const m = map[lead.score] || { label: "Non évalué", mod: "none" };
   const open = state.openScoreMenu;
   const isOpen = !!open && open.id === lead.id && open.surface === surface;
   const opts3 = [
-    { v: "hot",  label: "Chaud", mod: "hot"  },
-    { v: "warm", label: "Tiède", mod: "warm" },
-    { v: "cold", label: "Froid", mod: "cold" },
+    { v: "hot",  label: "Prioritaire", mod: "hot"  },
+    { v: "warm", label: "Intéressant", mod: "warm" },
+    { v: "cold", label: "Faible", mod: "cold" },
     { v: "none", label: "Non évalué", mod: "none" },
   ];
   const menu = isOpen ? `
@@ -4693,10 +4922,11 @@ function renderColumnHeader(key, label, colClass) {
 function renderLeadRow(lead) {
   const selected     = state.drawer?.leadId === lead.id;
   const picked       = state.selectedLeadIds.includes(lead.id);
-  // V1 table (v0.13.0): Nom · Budget · Secteur · Timing · Statut · Score · Date.
-  // Agent column removed (no assignment in V1; assignedAgentId stays for V2).
-  // Secteur and Timing are separate columns — never merged (Greg brief §3).
-  // Statut is inline-editable via renderStatusCell; Score cycles on click.
+  // V1 table (v0.18.9, 31-05 redirect): Date · Nom · Budget · Secteur · Timing ·
+  // Statut · Score. Date moved first; email-under-name removed (email stays in
+  // the drawer). Agent column removed (no assignment in V1; assignedAgentId stays
+  // for V2). Secteur and Timing are separate columns — never merged (Greg §3).
+  // Statut is inline-editable via renderStatusCell; Score via renderScoreCell.
   const secteur      = lead.secteur || "—";
   const timing       = timingShort(leadTimeline(lead));
   const checkboxCell = state.selectionMode
@@ -4709,11 +4939,11 @@ function renderLeadRow(lead) {
          data-selected="${selected}"
          role="button" tabindex="0">
       ${checkboxCell}
+      <div class="leads-col leads-col--date">${formatLeadDateHuman(lead.createdAt)}</div>
       <div class="leads-col leads-col--nom">
         ${renderAvatar(lead.initials, lead.tone, 34)}
         <div class="leads-col-nom-text">
           <div class="leads-col-nom-name">${lead.name}</div>
-          <div class="leads-col-nom-email">${lead.email}</div>
         </div>
       </div>
       <div class="leads-col leads-col--budget"><span class="budget-tag">${leadPrice(lead)}</span></div>
@@ -4721,7 +4951,6 @@ function renderLeadRow(lead) {
       <div class="leads-col leads-col--timing">${timing}</div>
       <div class="leads-col leads-col--statut">${renderStatusCell(lead)}</div>
       <div class="leads-col leads-col--score">${renderScoreCell(lead, { surface: "row" })}</div>
-      <div class="leads-col leads-col--date">${formatLeadDateHuman(lead.createdAt)}</div>
     </div>
   `;
 }
@@ -4875,10 +5104,10 @@ function renderBulkStatusMenu() {
 
 function renderBulkScoreMenu() {
   const opts3 = [
-    { v: "hot",  label: "Chaud",      mod: "hot"  },
-    { v: "warm", label: "Tiède",      mod: "warm" },
-    { v: "cold", label: "Froid",      mod: "cold" },
-    { v: "none", label: "Non évalué", mod: "none" },
+    { v: "hot",  label: "Prioritaire", mod: "hot"  },
+    { v: "warm", label: "Intéressant", mod: "warm" },
+    { v: "cold", label: "Faible",      mod: "cold" },
+    { v: "none", label: "Non évalué",  mod: "none" },
   ];
   return `
     <div class="score-menu" role="listbox" aria-label="Changer le score">
@@ -4896,13 +5125,16 @@ function renderBulkScoreMenu() {
      state.filterTab as the stage cards (one source of truth). "Perdu"/"today"
      aren't offered here — Perdu is terminal, "today" is the quick card + the
      Date "Aujourd'hui" preset.
-   - Score: multi-select chips (Chaud/Tiède/Froid/Non évalué) → state.filters.score.
+   - Score: multi-select chips (Prioritaire/Intéressant/Faible/Non évalué) → state.filters.score.
    - Date: single-select presets (Tous/Aujourd'hui/7j/30j/Ce mois) → state.filters.date.
    All of these refine computeLeadsView; pagination then slices the result. */
 function renderFilterPanel() {
   const stages = (state.agency.pipeline.buyer || []);
-  const fScore = state.filters.score || [];
-  const fDate  = state.filters.date || null;
+  const fScore   = state.filters.score   || [];
+  const fDate    = state.filters.date    || null;
+  const fBudget  = state.filters.budget  || [];
+  const fSecteur = state.filters.secteur || [];
+  const fTiming  = state.filters.timing  || [];
 
   const statutOpts = [{ id: "all", label: "Tous" }, ...stages.map(s => ({ id: s.id, label: s.label }))];
   const statutHtml = statutOpts.map(o => {
@@ -4913,9 +5145,9 @@ function renderFilterPanel() {
   }).join("");
 
   const scoreOpts = [
-    { v: "hot",  label: "Chaud", mod: "hot"  },
-    { v: "warm", label: "Tiède", mod: "warm" },
-    { v: "cold", label: "Froid", mod: "cold" },
+    { v: "hot",  label: "Prioritaire", mod: "hot"  },
+    { v: "warm", label: "Intéressant", mod: "warm" },
+    { v: "cold", label: "Faible", mod: "cold" },
     { v: "none", label: "Non évalué", mod: "none" },
   ];
   const scoreHtml = scoreOpts.map(o => {
@@ -4937,7 +5169,38 @@ function renderFilterPanel() {
                     data-action="set-filter-date" data-date="${o.v}">${o.label}</button>`;
   }).join("");
 
-  const anyActive = (state.filterTab !== "all" && state.filterTab !== "lost") || fScore.length || fDate;
+  // v0.18.11 (ADR-0009) — Budget · Secteur · Timing, all multi-select. Option
+  // values come FROM the live buyer lead set (values-from-data, ADR-0021's
+  // principle), sorted by a known order where one exists, so they always match
+  // the seed and a new answer option would appear automatically. data-* carries
+  // the raw value (it can contain spaces/accents → encode for the attribute,
+  // decode in the handler). v0.18.11 (ADR-0022): derive options from the live
+  // non-archived set so the panel doesn't offer a value only an archived lead has.
+  const buyers = state.leads.filter(l => l.type === "buyer" && !isArchived(l));
+  const distinct = (pick) => [...new Set(buyers.map(pick).filter(Boolean))];
+  const orderBy = (vals, order) => {
+    const known = order.filter(o => vals.includes(o));
+    const extra = vals.filter(v => !order.includes(v)).sort();
+    return [...known, ...extra];
+  };
+
+  const budgetVals  = orderBy(distinct(l => l.budget), BUDGET_ORDER);
+  const secteurVals = orderBy(distinct(l => l.secteur), KNOWN_ZONES);
+  const timingVals  = orderBy(distinct(l => leadTimeline(l)), TIMING_DIST_ORDER);
+
+  const multiHtml = (vals, active, actionVerb, attr, labelFn) => vals.map(v => {
+    const on = active.includes(v);
+    const label = labelFn ? labelFn(v) : v;
+    return `<button class="filter-opt${on ? " filter-opt--on" : ""}" role="option" aria-selected="${on}"
+                    data-action="${actionVerb}" data-${attr}="${encodeURIComponent(v)}">${label}${on ? `<span class="filter-check">${icon.check()}</span>` : ""}</button>`;
+  }).join("");
+
+  const budgetHtml  = multiHtml(budgetVals,  fBudget,  "toggle-filter-budget",  "budget");
+  const secteurHtml = multiHtml(secteurVals, fSecteur, "toggle-filter-secteur", "secteur");
+  const timingHtml  = multiHtml(timingVals,  fTiming,  "toggle-filter-timing",  "timing", timingShort);
+
+  const anyActive = (state.filterTab !== "all" && state.filterTab !== "lost")
+    || fScore.length || fDate || fBudget.length || fSecteur.length || fTiming.length;
 
   return `
     <div class="leads-filter-panel" role="dialog" aria-label="Filtres">
@@ -4948,6 +5211,18 @@ function renderFilterPanel() {
       <div class="filter-group">
         <div class="filter-group-label">Score</div>
         <div class="filter-opts">${scoreHtml}</div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-group-label">Budget</div>
+        <div class="filter-opts">${budgetHtml}</div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-group-label">Secteur</div>
+        <div class="filter-opts">${secteurHtml}</div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-group-label">Timing</div>
+        <div class="filter-opts">${timingHtml}</div>
       </div>
       <div class="filter-group">
         <div class="filter-group-label">Date</div>
@@ -4991,10 +5266,15 @@ function renderLeadsTable(view) {
   const visibleIds       = view.visible.map(l => l.id);
   // v0.15 — active filter dimensions: Statut (filterTab is a stage/today),
   // Score (set non-empty), Date (preset set). Badge shows how many are on.
+  // v0.18.11 (ADR-0009) — Budget · Secteur · Timing join the count.
   const statutActive     = state.filterTab !== "all" && state.filterTab !== "lost";
-  const scoreActive      = (state.filters.score || []).length > 0;
+  const scoreActive      = (state.filters.score   || []).length > 0;
   const dateActive       = !!state.filters.date;
-  const activeDims       = (statutActive ? 1 : 0) + (scoreActive ? 1 : 0) + (dateActive ? 1 : 0);
+  const budgetActive     = (state.filters.budget  || []).length > 0;
+  const secteurActive    = (state.filters.secteur || []).length > 0;
+  const timingActive     = (state.filters.timing  || []).length > 0;
+  const activeDims       = (statutActive ? 1 : 0) + (scoreActive ? 1 : 0) + (dateActive ? 1 : 0)
+                         + (budgetActive ? 1 : 0) + (secteurActive ? 1 : 0) + (timingActive ? 1 : 0);
   const filterBadge      = activeDims
     ? `<span class="leads-table-btn-badge">${activeDims}</span>`
     : "";
@@ -5062,13 +5342,13 @@ function renderLeadsTable(view) {
       : `
         <div class="leads-table-head${state.selectionMode ? " leads-table-head--selectable" : ""}" role="row">
           ${checkHead}
+          ${renderColumnHeader("date",    "Date",    "leads-col--date")}
           ${renderColumnHeader("name",    "Nom",     "leads-col--nom")}
           ${renderColumnHeader("budget",  "Budget",  "leads-col--budget")}
           ${renderColumnHeader("secteur", "Secteur recherché", "leads-col--secteur")}
           ${renderColumnHeader("timing",  "Timing",  "leads-col--timing")}
           ${renderColumnHeader("statut",  "Statut",  "leads-col--statut")}
           ${renderColumnHeader("score",   "Score",   "leads-col--score")}
-          ${renderColumnHeader("date",    "Date",    "leads-col--date")}
         </div>
         <div class="leads-table-body${state.selectionMode ? " leads-table-body--selectable" : ""}" role="rowgroup">
           ${pageSlice.map(renderLeadRow).join("")}
@@ -5093,6 +5373,9 @@ function renderLeadsTable(view) {
             </button>
             ${state.filterPanelOpen ? renderFilterPanel() : ""}
           </div>
+          <button class="leads-table-btn" data-action="export-csv"${totalVisible === 0 ? " disabled" : ""} aria-label="Exporter en CSV" title="Exporter la vue filtrée (${totalVisible}) en CSV">
+            ${icon.download()}<span>Exporter</span>
+          </button>
           ${bulkButtons}
         </div>
       </div>
@@ -5120,17 +5403,22 @@ function renderLeadsContent() {
         ${renderLeadsContextChip(state.leadType, typeCount)}
         <span class="leads-updated-meta">Mis à jour il y a 2 min</span>
       </div>
+      ${/* DORMANT (v0.18.9, ADR-0020): Vue-rapide chips. Their only triggers were
+           the dashboard priority tiles, removed in the 31-05 redirect, so
+           state.vueRapide is never populated and this renders "". Call kept so
+           the chips light up again with no rewiring if the tiles return (Phase 2). */ ""}
       ${renderVueRapideChips()}
       ${renderLeadsTable(view)}
     </div>
   `;
 }
 
-/* v0.18 — Vue rapide chips (ADR-0014). Dismissible chips above the table that
-   carry filter state richer than the Filters panel can express
-   (contactPreference, age threshold, campaign). The chip IS the filter;
-   closing it drops back to a panel-driven view. Chips compose with the panel
-   (intersection) and with each other. */
+/* DORMANT in V1 (v0.18.9, ADR-0020): Vue-rapide chips (ADR-0014). Dismissible
+   chips above the table carrying filter state richer than the Filters panel
+   (contactPreference, age threshold, campaign). Their only producers were the
+   dashboard priority tiles, removed in the 31-05 redirect — so state.vueRapide
+   stays empty and this returns "". Kept intact (with its clear-vue-rapide
+   handler) for a Phase-2 re-add if the tiles return. */
 function renderVueRapideChips() {
   if (!state.vueRapide.length) return "";
   const chips = state.vueRapide.map(v => `
@@ -5210,6 +5498,9 @@ const ZONE_GREY  = "#E6E6EA";
 const BUDGET_ORDER  = ["Moins de 1M", "1M–2M", "2M–4M", "4M+"];
 const TIMING_DIST_ORDER = ["Immédiatement", "Dans les 6 prochains mois", "Plus de 6 mois"];
 const FEATURE_ORDER = ["Vue dégagée", "Style haussmannien", "Architecture contemporaine signée", "Autre"];
+/* v0.18.11 — type-de-projet ordering for the new dashboard breakdown (V1_SCOPE
+   §4 question 1: Résidence principale · Pied-à-terre). */
+const PROJECT_ORDER = ["Résidence principale", "Pied-à-terre"];
 
 /* Rolling-window count. `days` back from now (inclusive). Used by Bloc 1 KPIs
    and their velocity deltas. Rolling (not calendar) so the headline never
@@ -5226,7 +5517,9 @@ function countInRollingWindow(leads, days, offsetWindows = 0) {
   }).length;
 }
 
-/* Velocity delta: % change of current window vs the equivalent previous one.
+/* DORMANT in V1 (v0.18.9, ADR-0020): velocity delta fed the removed Vue-globale
+   KPI pills (31-05 redirect). Kept for a possible Phase-2 re-add.
+   Velocity delta: % change of current window vs the equivalent previous one.
    Returns { pct, dir }. dir ∈ "up"|"down"|"flat". null previous (0 leads
    before) → flat with no pct so we don't divide by zero / show +Inf%. */
 function velocityDelta(curr, prev) {
@@ -5274,17 +5567,28 @@ function computeDashboardView(periode, campagne) {
   const demoNonParis = campagne === "__demo_non_paris__";
 
   // Buyer leads only (V1 is buyer-only). Scope by Période + Campagne.
-  let leads = state.leads.filter(l => l.type === "buyer");
+  // v0.18.11 (ADR-0022): archived leads excluded at the base, so every dashboard
+  // figure downstream (KPIs, scores, statuts, secteurs, budgets, timing,
+  // caractéristiques, type de projet, top-5) drops accordingly — one choke point.
+  let leads = state.leads.filter(l => l.type === "buyer" && !isArchived(l));
   const allBuyers = leads;
   if (!demoNonParis && campagne) leads = leads.filter(l => l.campaign === campagne);
   const scoped = leads.filter(l => leadInPeriode(l, periode));
 
   const total = scoped.length;
 
-  // ── Bloc 1 — Vue globale (rolling KPIs / single-period card) ──
-  // Rolling KPIs always compute off the full buyer set (campagne-scoped),
-  // independent of the Période preset: they ARE the time view. When a specific
-  // Période is set, Bloc 1 collapses to a single "sur la période" card.
+  // ── Header KPIs (v0.18.9, 31-05 redirect, ADR-0020) ──
+  // Two non-clickable figures: Leads totaux (scoped total) + Leads ce mois-ci
+  // (current calendar month). No rolling windows, no velocity.
+  const now = new Date();
+  const monthCount = scoped.filter(l => {
+    const d = new Date(l.createdAt);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).length;
+
+  // ── DORMANT (v0.18.9, ADR-0020): rolling-window KPIs + velocity fed the old
+  // clickable Vue-globale row, removed in the 31-05 dashboard redirect. Kept
+  // computed for a possible Phase-2 re-add (reverses ADR-0012/0015). ──
   const rollingBase = demoNonParis ? allBuyers : leads;
   const week   = countInRollingWindow(rollingBase, 7);
   const weekPrev = countInRollingWindow(rollingBase, 7, 1);
@@ -5299,12 +5603,14 @@ function computeDashboardView(periode, campagne) {
   });
 
   // ── Bloc 3 — Statuts (forward stages + Perdu split) ──
-  const statusCounts = { nouveau: 0, a_contacter: 0, contacte: 0, visite_prevue: 0, lost: 0 };
+  const statusCounts = { nouveau: 0, a_contacter: 0, contacte: 0, lost: 0 };
   scoped.forEach(l => {
     if (statusCounts[l.status] !== undefined) statusCounts[l.status]++;
   });
 
-  // ── À traiter en priorité (ADR-0013) ──
+  // ── DORMANT (v0.18.9, ADR-0020): the "À traiter en priorité" tiles (ADR-0013)
+  // were removed in the 31-05 redirect. Counts kept computed for a possible
+  // Phase-2 re-add; AGING_THRESHOLD_DAYS likewise parked DORMANT. ──
   const immediatesUntreated = scoped.filter(l =>
     l.contactPreference === "Tout de suite" && l.status === "nouveau").length;
   const agingNouveau = scoped.filter(l =>
@@ -5351,12 +5657,33 @@ function computeDashboardView(periode, campagne) {
   const timings  = distOf(TIMING_DIST_ORDER, l => leadTimeline(l));
   const features = distOf(FEATURE_ORDER, l => l.features || []);
 
+  // ── v0.18.11 — two new breakdowns (extend the v0.18.9 dashboard relock;
+  // count + % of total, same renderDistRow family; CHANGELOG, no ADR). Both
+  // read `scoped`, so they inherit Période/Campagne scoping AND (once Item 3
+  // lands) the archived exclusion baked into `scoped` — single choke point. ──
+  // (a) Type de projet — single-select, 2 buckets (Résidence principale /
+  //     Pied-à-terre). PROJECT_ORDER fixes the display order.
+  const projectTypes = distOf(PROJECT_ORDER, l => l.projectType);
+  // (b) Top-5 caractéristiques — flatten every lead's features[], tally, sort
+  //     by count desc; ties broken by FEATURE_ORDER for a stable order; take
+  //     the 5 most frequent. Fewer than 5 distinct values → fewer rows (no
+  //     padding). Each row's % is "% des leads" (multi-select; a feature held
+  //     by half the leads reads ~50%), so the denominator is the scoped total.
+  const featTally = {};
+  scoped.forEach(l => (l.features || []).forEach(f => { if (f) featTally[f] = (featTally[f] || 0) + 1; }));
+  const topFeatures = Object.keys(featTally)
+    .map(label => ({ label, count: featTally[label] }))
+    .sort((a, b) => (b.count - a.count) || (FEATURE_ORDER.indexOf(a.label) - FEATURE_ORDER.indexOf(b.label)))
+    .slice(0, 5);
+
   return {
-    total, periode, campagne, demoNonParis,
+    total, monthCount, periode, campagne, demoNonParis,
     bloc1: { week, weekPrev, month, monthPrev },
     scores: scoreCounts,
     statuses: statusCounts,
     priorities: { immediatesUntreated, agingNouveau },
+    projectTypes,
+    topFeatures,
     meta: { parisMode, secteurRows, budgets, timings, features },
   };
 }
@@ -5366,23 +5693,31 @@ function computeDashboardView(periode, campagne) {
 /* One horizontal-bar row. `max` scales the fill (relative to the biggest row
    in its group, so a group reads as a comparison). colorHex paints both dot
    and fill; pass dot=false for the factual Bloc-4 groups that don't carry a
-   leading dot. */
+   leading dot. v0.18.9 (ADR-0020): pass opts.total to show "count · xx %" of
+   the group total alongside the bar. */
 function renderDistRow(label, count, max, colorHex, opts = {}) {
   const w = max > 0 ? Math.max(2, Math.round((count / max) * 100)) : 0;
   const dot = opts.dot === false ? "" :
     `<span class="dash-bar-dot" style="background:${colorHex}"></span>`;
+  const pct = (opts.total && opts.total > 0)
+    ? `<span class="dash-bar-pct">${Math.round((count / opts.total) * 100)}\u00A0%</span>`
+    : "";
   return `
     <div class="dash-bar-row${opts.muted ? " dash-bar-row--muted" : ""}">
       <span class="dash-bar-label">${dot}${label}</span>
       <span class="dash-bar-track"><span class="dash-bar-fill" style="width:${w}%;background:${colorHex}"></span></span>
-      <span class="dash-bar-val">${count}</span>
+      <span class="dash-bar-val">${count}${pct}</span>
     </div>`;
 }
 
 /* Bloc-4 factual group (label above, value top-right, full-width track below).
-   Matches the mockup's .b4-col layout. */
-function renderDashFactGroup(title, rows, caption = "") {
+   Matches the mockup's .b4-col layout. v0.18.9 (ADR-0020): each row shows
+   count + % of the group total. `total` defaults to the sum of the group's
+   counts (right for single-select groups: budgets, timings); pass an explicit
+   total for multi-select groups (features) where rows can exceed lead count. */
+function renderDashFactGroup(title, rows, caption = "", total = null) {
   const max = rows.reduce((m, r) => Math.max(m, r.count), 0);
+  const denom = total != null ? total : rows.reduce((s, r) => s + r.count, 0);
   const cap = caption
     ? `<span class="dash-fact-multi">${caption}</span>` : "";
   return `
@@ -5391,10 +5726,13 @@ function renderDashFactGroup(title, rows, caption = "") {
       <div class="dash-fact-bars">
         ${rows.map(r => {
           const w = max > 0 ? Math.max(2, Math.round((r.count / max) * 100)) : 0;
+          const pct = denom > 0
+            ? `<span class="dash-fact-pct">${Math.round((r.count / denom) * 100)}\u00A0%</span>`
+            : "";
           return `
             <div class="dash-fact-row">
               <span class="dash-fact-label">${r.label}</span>
-              <span class="dash-fact-val">${r.count}</span>
+              <span class="dash-fact-val">${r.count}${pct}</span>
               <span class="dash-fact-track"><span class="dash-fact-fill" style="width:${w}%"></span></span>
             </div>`;
         }).join("")}
@@ -5419,62 +5757,31 @@ function dashDeltaPill(delta) {
 
 /* Bloc 1 — adaptive. Default (Toutes les dates) = two rolling KPI cards;
    a specific Période = single "Leads sur la période" card. */
+/* Header KPIs (v0.18.9, 31-05 redirect, ADR-0020). Two non-clickable figures:
+   Leads totaux + Leads ce mois-ci. Replaces the old clickable adaptive Vue-
+   globale row (ADR-0012) + its velocity deltas — both removed. No interaction,
+   no handoff to the Leads page. */
 function renderDashBloc1(dv) {
-  if (!dv.periode) {
-    const wDelta = velocityDelta(dv.bloc1.week, dv.bloc1.weekPrev);
-    const mDelta = velocityDelta(dv.bloc1.month, dv.bloc1.monthPrev);
-    return `
-      <section class="dash-block">
-        <div class="dash-block-title">Vue globale
-          <span class="dash-hint">fenêtres glissantes · vélocité vs période équivalente précédente</span>
-        </div>
-        <div class="dash-kpi-row">
-          <div class="dash-kpi">
-            <div class="dash-kpi-top">
-              <div class="dash-kpi-n">${dv.bloc1.week}</div>
-              ${dashDeltaPill(wDelta)}
-            </div>
-            <div class="dash-kpi-l">Cette semaine</div>
-            <div class="dash-kpi-w">7 derniers jours · vs 7 jours précédents</div>
-          </div>
-          <div class="dash-kpi">
-            <div class="dash-kpi-top">
-              <div class="dash-kpi-n">${dv.bloc1.month}</div>
-              ${dashDeltaPill(mDelta)}
-            </div>
-            <div class="dash-kpi-l">Ce mois</div>
-            <div class="dash-kpi-w">30 derniers jours · vs 30 jours précédents</div>
-          </div>
-        </div>
-      </section>`;
-  }
-  // Single-period variant. Compare the period's count against the equivalent
-  // previous window where the preset maps to a rolling span (7d / 30d); for
-  // today / month we show the count without a synthetic delta.
-  let delta = { pct: null, dir: "flat" }, windowNote = "";
-  if (dv.periode === "7d")  { delta = velocityDelta(dv.bloc1.week,  dv.bloc1.weekPrev);  windowNote = "7 derniers jours · vs 7 jours précédents"; }
-  else if (dv.periode === "30d") { delta = velocityDelta(dv.bloc1.month, dv.bloc1.monthPrev); windowNote = "30 derniers jours · vs 30 jours précédents"; }
-  else windowNote = PERIODE_LABELS[dv.periode];
   return `
     <section class="dash-block">
-      <div class="dash-block-title">Vue globale
-        <span class="dash-hint">période : ${PERIODE_LABELS[dv.periode]}</span>
-      </div>
-      <div class="dash-kpi-row dash-kpi-row--single">
-        <div class="dash-kpi">
-          <div class="dash-kpi-top">
-            <div class="dash-kpi-n">${dv.total}</div>
-            ${(dv.periode === "7d" || dv.periode === "30d") ? dashDeltaPill(delta) : ""}
-          </div>
-          <div class="dash-kpi-l">Leads sur la période</div>
-          <div class="dash-kpi-w">${windowNote}</div>
+      <div class="dash-kpi-row dash-kpi-row--static">
+        <div class="dash-kpi dash-kpi--static">
+          <div class="dash-kpi-n">${dv.total}</div>
+          <div class="dash-kpi-l">Leads totaux</div>
+        </div>
+        <div class="dash-kpi dash-kpi--static">
+          <div class="dash-kpi-n">${dv.monthCount}</div>
+          <div class="dash-kpi-l">Leads ce mois-ci</div>
         </div>
       </div>
     </section>`;
 }
 
-/* À traiter en priorité (ADR-0013). Two tiles, both tappable → Leads page
-   pre-filtered via a Vue rapide chip (ADR-0014). */
+/* DORMANT in V1 (v0.18.9, ADR-0020): "À traiter en priorité" — two tappable
+   tiles (ADR-0013) that handed off to the Leads page via Vue-rapide chips
+   (ADR-0014). Removed from renderDashboard in the 31-05 dashboard redirect
+   (reverses ADR-0012/0015). Kept in-file for a possible Phase-2 re-add when the
+   dashboard regains interactivity. No live call site. */
 function renderDashPriorities(dv) {
   const p = dv.priorities;
   return `
@@ -5509,10 +5816,10 @@ function renderDashPriorities(dv) {
 function renderDashScoresStatuts(dv) {
   const sc = dv.scores;
   const scoreMeta = [
-    { key: "hot",  label: "Chaud",      hex: "#E24B4A" },
-    { key: "warm", label: "Tiède",      hex: "#F5B94C" },
-    { key: "cold", label: "Froid",      hex: "#85B7EB" },
-    { key: "none", label: "Non évalué", hex: "#B6B3AC" },
+    { key: "hot",  label: "Prioritaire", hex: "#E24B4A" },
+    { key: "warm", label: "Intéressant", hex: "#F5B94C" },
+    { key: "cold", label: "Faible",      hex: "#85B7EB" },
+    { key: "none", label: "Non évalué",  hex: "#B6B3AC" },
   ];
   const scoreMax = Math.max(...scoreMeta.map(m => sc[m.key]), 0);
 
@@ -5521,25 +5828,71 @@ function renderDashScoresStatuts(dv) {
     { key: "nouveau",       label: "Nouveau",       hex: "#8A8780" },
     { key: "a_contacter",   label: "À contacter",   hex: "#C99A3E" },
     { key: "contacte",      label: "Contacté",      hex: "#6D48DB" },
-    { key: "visite_prevue", label: "Visite prévue", hex: "#2F9D6F" },
   ];
   const stageMax = Math.max(...stageMeta.map(m => st[m.key]), st.lost, 0);
+
+  // % of total: scores cover every lead (none = unscored); statuts cover the
+  // 3 forward stages + Perdu. Each set sums to the scoped lead count.
+  const scoreTotal = scoreMeta.reduce((s, m) => s + sc[m.key], 0);
+  const statusTotal = stageMeta.reduce((s, m) => s + st[m.key], 0) + st.lost;
 
   return `
     <div class="dash-pair">
       <section class="dash-block">
         <div class="dash-block-title">Répartition des scores</div>
         <div class="dash-bars">
-          ${scoreMeta.map(m => renderDistRow(m.label, sc[m.key], scoreMax, m.hex)).join("")}
+          ${scoreMeta.map(m => renderDistRow(m.label, sc[m.key], scoreMax, m.hex, { total: scoreTotal })).join("")}
         </div>
       </section>
       <section class="dash-block">
         <div class="dash-block-title">Répartition des statuts</div>
         <div class="dash-bars">
-          ${stageMeta.map(m => renderDistRow(m.label, st[m.key], stageMax, m.hex)).join("")}
+          ${stageMeta.map(m => renderDistRow(m.label, st[m.key], stageMax, m.hex, { total: statusTotal })).join("")}
         </div>
         <div class="dash-terminal-split">
-          ${renderDistRow("Perdu", st.lost, stageMax, "#D98989", { muted: true })}
+          ${renderDistRow("Perdu", st.lost, stageMax, "#D98989", { muted: true, total: statusTotal })}
+        </div>
+      </section>
+    </div>`;
+}
+
+/* v0.18.11 — two new breakdowns (Type de projet · Top-5 caractéristiques),
+   added to the v0.18.9 dashboard relock (ADR-0020 shape: count + % of total,
+   renderDistRow family). Same side-by-side dash-pair as Scores/Statuts; reuses
+   the existing visual language, no new components. CHANGELOG-tracked (extends
+   the dashboard; not an ADR). Both read dv fields fed off computeDashboardView's
+   scoped array. */
+function renderDashProjectFeatures(dv) {
+  const pt = dv.projectTypes;  // [{label,count}] in PROJECT_ORDER
+  const ptTotal = pt.reduce((s, r) => s + r.count, 0);
+  const ptMax   = pt.reduce((m, r) => Math.max(m, r.count), 0);
+  // Two stable tints (neutral accent family — factual, like Bloc 4).
+  const ptHex = { "Résidence principale": "#5B6DFF", "Pied-à-terre": "#9AA6FF" };
+
+  const tf = dv.topFeatures;   // up to 5 {label,count}, sorted desc
+  const tfMax = tf.reduce((m, r) => Math.max(m, r.count), 0);
+  // Multi-select: % of the scoped lead count ("% des leads"), like Bloc 4
+  // Caractéristiques — a feature held by half the leads reads ~50%.
+  const tfDenom = dv.total;
+
+  const tfBody = tf.length
+    ? tf.map(r => renderDistRow(r.label, r.count, tfMax, "#7C5BE0", { total: tfDenom })).join("")
+    : `<div class="dash-empty-note">Aucune caractéristique renseignée</div>`;
+
+  return `
+    <div class="dash-pair">
+      <section class="dash-block">
+        <div class="dash-block-title">Type de projet</div>
+        <div class="dash-bars">
+          ${pt.map(r => renderDistRow(r.label, r.count, ptMax, ptHex[r.label] || "#5B6DFF", { total: ptTotal })).join("")}
+        </div>
+      </section>
+      <section class="dash-block">
+        <div class="dash-block-title">Top 5 caractéristiques recherchées
+          <span class="dash-hint">plusieurs réponses possibles · % des leads</span>
+        </div>
+        <div class="dash-bars">
+          ${tfBody}
         </div>
       </section>
     </div>`;
@@ -5580,8 +5933,9 @@ function renderDashMeta(dv) {
   const tintOf = {};
   ranked.forEach((r, i) => { tintOf[r.label] = ZONE_TINTS[Math.min(i, ZONE_TINTS.length - 1)]; });
 
+  const secteurTotal = m.secteurRows.reduce((s, r) => s + r.count, 0);
   const secteurBars = m.secteurRows.map(r =>
-    renderDistRow(r.label, r.count, secteurMax, tintOf[r.label] || "#5B6DFF")
+    renderDistRow(r.label, r.count, secteurMax, tintOf[r.label] || "#5B6DFF", { total: secteurTotal })
   ).join("");
 
   const secteurSection = m.parisMode
@@ -5617,7 +5971,7 @@ function renderDashMeta(dv) {
       <div class="dash-fact-cols">
         ${renderDashFactGroup("Budgets", m.budgets)}
         ${renderDashFactGroup("Timing projet", m.timings)}
-        ${renderDashFactGroup("Caractéristiques", m.features, "plusieurs réponses possibles")}
+        ${renderDashFactGroup("Caractéristiques", m.features, "plusieurs réponses possibles · % des leads", dv.total)}
       </div>
     </section>`;
 }
@@ -5633,7 +5987,8 @@ function renderDashFilters() {
   ];
   // Campaign options from the live buyer seed, with counts. Plus the demo
   // non-Paris option (demonstrates the map fallback on fabricated data).
-  const buyers = state.leads.filter(l => l.type === "buyer");
+  // v0.18.11 (ADR-0022): exclude archived so campaign counts match the dashboard.
+  const buyers = state.leads.filter(l => l.type === "buyer" && !isArchived(l));
   const campCounts = {};
   buyers.forEach(l => { if (l.campaign) campCounts[l.campaign] = (campCounts[l.campaign] || 0) + 1; });
   const campOpts = Object.entries(campCounts)
@@ -5673,8 +6028,8 @@ function renderDashboard() {
       </div>
       <div class="dash-content">
         ${renderDashBloc1(dv)}
-        ${renderDashPriorities(dv)}
         ${renderDashScoresStatuts(dv)}
+        ${renderDashProjectFeatures(dv)}
         ${renderDashMeta(dv)}
       </div>
     </div>`;
@@ -5683,6 +6038,7 @@ function renderDashboard() {
 function renderRouteContent() {
   if (state.route === "leads") return renderLeadsContent();
   if (state.route === "dashboard") return renderDashboard();
+  if (state.route === "archives") return renderArchives();
   return renderRouteComingSoon();
 }
 
@@ -5714,6 +6070,62 @@ function isMobile() {
   return window.matchMedia("(max-width: 768px)").matches;
 }
 
+/* v0.18.11 (ADR-0022) — Archives view. The ONE surface that inverts isArchived:
+   lists buyer leads where archived === true (V1 is buyer-only). Each row shows
+   identity + secteur + the archive date and a Restore action (restore-lead →
+   archived=false, archivedAt=null, lead reappears in the main list and every
+   counter). Reuses the leads-table-card chrome + .archives-* row styling; no new
+   visual language. Empty state when nothing is archived. */
+function renderArchives() {
+  const archived = state.leads
+    .filter(l => l.type === "buyer" && isArchived(l))
+    .sort((a, b) => new Date(b.archivedAt || 0) - new Date(a.archivedAt || 0));
+
+  const body = archived.length === 0
+    ? `<div class="archives-empty">
+         <div class="archives-empty-title">Aucun lead archivé</div>
+         <div class="archives-empty-body">Les leads que vous archivez depuis la liste ou la fiche apparaissent ici. Vous pouvez les restaurer à tout moment.</div>
+       </div>`
+    : `
+      <div class="archives-head" role="row">
+        <div class="archives-col archives-col--nom">Nom</div>
+        <div class="archives-col archives-col--secteur">Secteur recherché</div>
+        <div class="archives-col archives-col--date">Archivé le</div>
+        <div class="archives-col archives-col--action"></div>
+      </div>
+      <div class="archives-list" role="rowgroup">
+        ${archived.map(renderArchiveRow).join("")}
+      </div>`;
+
+  return `
+    <div class="archives">
+      <div class="archives-intro">
+        <div class="archives-title">Archives</div>
+        <div class="archives-sub">${archived.length} lead${archived.length === 1 ? "" : "s"} archivé${archived.length === 1 ? "" : "s"} · exclus de la liste, du tableau de bord et de l'export</div>
+      </div>
+      <div class="leads-table-card">
+        ${body}
+      </div>
+    </div>`;
+}
+
+function renderArchiveRow(lead) {
+  return `
+    <div class="archives-row" role="row">
+      <div class="archives-col archives-col--nom">
+        ${renderAvatar(lead.initials, lead.tone, 34)}
+        <span class="archives-row-name">${lead.name}</span>
+      </div>
+      <div class="archives-col archives-col--secteur">${lead.secteur || "—"}</div>
+      <div class="archives-col archives-col--date">${formatLeadDateHuman(lead.archivedAt)}</div>
+      <div class="archives-col archives-col--action">
+        <button class="leads-table-btn" data-action="restore-lead" data-lead-id="${lead.id}" aria-label="Restaurer ${lead.name}">
+          ${icon.rotateCcw ? icon.rotateCcw() : ""}<span>Restaurer</span>
+        </button>
+      </div>
+    </div>`;
+}
+
 /* ── Messages rapides — default templates (v0.11.2) ─────────────────────
    Transcribed VERBATIM from Greg's V1 brief (openhouse_V1_brief.pdf §5).
    Merge fields [Prénom] / [Nom de l'agence] are substituted at tap time by
@@ -5743,7 +6155,7 @@ function mergeTemplate(tpl, lead) {
 /* Phone → wa.me digits (E.164 without the +). */
 function waDigits(phone) { return (phone || "").replace(/\D/g, ""); }
 
-/* Qualification chips (v0.11.2) — Chaud/Tiède/Froid as coloured selectable
+/* Qualification chips (v0.11.2) — Prioritaire/Intéressant/Faible as coloured selectable
    chips. Writes the SAME lead.score the table cycles + the new score dropdown
    sets (V1_SCOPE §2.3, data-action="set-score").
    DORMANT in V1 (since the drawer redesign): no current call sites — the drawer
@@ -5751,9 +6163,9 @@ function waDigits(phone) { return (phone || "").replace(/\D/g, ""); }
    Statut dropdown. Kept as the chip-style primitive for a re-enabled surface. */
 function renderQualChips(lead) {
   const opts = [
-    { v: "hot",  label: "Chaud", mod: "hot"  },
-    { v: "warm", label: "Tiède", mod: "warm" },
-    { v: "cold", label: "Froid", mod: "cold" },
+    { v: "hot",  label: "Prioritaire", mod: "hot"  },
+    { v: "warm", label: "Intéressant", mod: "warm" },
+    { v: "cold", label: "Faible", mod: "cold" },
   ];
   return `
     <div class="qual-chips" role="group" aria-label="Qualification rapide">
@@ -5925,6 +6337,11 @@ function renderDrawer() {
       <div class="drawer-body" role="tabpanel">
         ${bodyByTab[activeTab]}
       </div>
+      <div class="drawer-foot">
+        ${isArchived(lead)
+          ? `<button class="drawer-foot-btn" data-action="restore-lead" data-lead-id="${lead.id}">${icon.rotateCcw()}<span>Restaurer le lead</span></button>`
+          : `<button class="drawer-foot-btn drawer-foot-btn--archive" data-action="archive-lead" data-lead-id="${lead.id}">${icon.archive()}<span>Archiver le lead</span></button>`}
+      </div>
     </aside>
   `;
 }
@@ -6034,13 +6451,11 @@ document.addEventListener("click", (e) => {
       // Stub — real logout posts to /api/auth/logout on the Express backend later
       setState({ userMenuOpen: false });
       break;
-    // v0.18 — À traiter en priorité tiles (ADR-0013) navigate to the Leads
-    // page pre-filtered via a Vue rapide chip (ADR-0014). The chip carries the
-    // dashboard's active Campagne too, so scope doesn't silently drop. The
-    // chip constraints can't all be expressed by the Filters panel
-    // (contactPreference, age threshold, campaign), which is exactly why the
-    // chip pattern exists. Pushing a chip resets the panel-native dims so the
-    // landing view is purely the chip's subset (then composable on top).
+    // DORMANT (v0.18.9, ADR-0020): the À-traiter-en-priorité tiles (ADR-0013)
+    // that emitted these vue-rapide-* actions were removed in the 31-05 redirect,
+    // so these cases are unreachable in V1. Kept (with applyVueRapide +
+    // clear-vue-rapide) so the handoff works again with no rewiring if the tiles
+    // return in Phase 2 (reverses ADR-0012/0015).
     case "vue-rapide-demandes-immediates":
       applyVueRapide({
         kind: "demandes-immediates",
@@ -6291,6 +6706,40 @@ document.addEventListener("click", (e) => {
       setState({ filterPanelOpen: !state.filterPanelOpen });
       break;
     }
+    case "export-csv": {
+      // v0.18.11 — export the current filtered/visible set to CSV (ADR-0009's
+      // deferred export). No state change — it reads computeLeadsView() and
+      // triggers a client-side download. Disabled in the UI when 0 visible.
+      exportLeadsCsv();
+      break;
+    }
+    case "archive-lead": {
+      // v0.18.11 (ADR-0022) — archive a lead. In-place mutate + setState (the
+      // confirmed pattern). Sets archived=true + archivedAt=now. The lead then
+      // drops out of every counter (computeLeadsView/computeDashboardView/badges
+      // all filter !isArchived) and moves to the Archives view. Close the drawer
+      // (the lead it shows is now off the Leads surface); reset to page 1.
+      const id = Number(target.getAttribute("data-lead-id"));
+      const lead = state.leads.find(l => l.id === id);
+      if (lead) {
+        lead.archived = true;
+        lead.archivedAt = new Date().toISOString();
+        setState({ drawer: null, selectedLeadIds: state.selectedLeadIds.filter(x => x !== id), leadsPage: 1 });
+      }
+      break;
+    }
+    case "restore-lead": {
+      // v0.18.11 (ADR-0022) — restore an archived lead: archived=false,
+      // archivedAt=null. It reappears in the main list and every counter.
+      const id = Number(target.getAttribute("data-lead-id"));
+      const lead = state.leads.find(l => l.id === id);
+      if (lead) {
+        lead.archived = false;
+        lead.archivedAt = null;
+        setState({ leadsPage: 1 });
+      }
+      break;
+    }
     case "set-filter-statut": {
       // v0.15 — Statut is filterTab (shared with the stage cards). "all" clears
       // it; a stage id sets it. Resets to page 1. Panel stays open so the user
@@ -6313,9 +6762,36 @@ document.addEventListener("click", (e) => {
       setState({ filters: { ...state.filters, date: d === "all" ? null : d }, leadsPage: 1 });
       break;
     }
+    case "toggle-filter-budget": {
+      // v0.18.11 (ADR-0009) — Budget is multi-select. Value is encodeURIComponent'd
+      // in the attribute (it carries spaces/accents); decode before toggling.
+      const v = decodeURIComponent(target.getAttribute("data-budget"));
+      const cur = state.filters.budget || [];
+      const next = cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v];
+      setState({ filters: { ...state.filters, budget: next }, leadsPage: 1 });
+      break;
+    }
+    case "toggle-filter-secteur": {
+      // v0.18.11 (ADR-0009) — Secteur is multi-select.
+      const v = decodeURIComponent(target.getAttribute("data-secteur"));
+      const cur = state.filters.secteur || [];
+      const next = cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v];
+      setState({ filters: { ...state.filters, secteur: next }, leadsPage: 1 });
+      break;
+    }
+    case "toggle-filter-timing": {
+      // v0.18.11 (ADR-0009) — Timing is multi-select. Values match leadTimeline()
+      // (the full label, e.g. "Immédiatement"); the chip shows the short label.
+      const v = decodeURIComponent(target.getAttribute("data-timing"));
+      const cur = state.filters.timing || [];
+      const next = cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v];
+      setState({ filters: { ...state.filters, timing: next }, leadsPage: 1 });
+      break;
+    }
     case "clear-filters": {
-      // v0.15 — reset every filter dimension (Statut/Score/Date) at once.
-      setState({ filterTab: "all", filters: { score: [], date: null }, leadsPage: 1 });
+      // v0.15 — reset every filter dimension at once. v0.18.11 (ADR-0009) —
+      // now also clears Budget · Secteur · Timing.
+      setState({ filterTab: "all", filters: { score: [], date: null, budget: [], secteur: [], timing: [] }, leadsPage: 1 });
       break;
     }
     case "goto-page": {
