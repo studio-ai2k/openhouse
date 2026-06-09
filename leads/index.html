@@ -1,5 +1,42 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.18
+  De-brand via client-config seam (ADR-0028). The master repo is now the GENERIC /
+  DEMO template: all client-specific identity is read through one neutral-defaulted
+  accessor, loadAgencyConfig() (parallel to ADR-0026's loadFormTemplates()), and the
+  mislabeled `cities` field is renamed to `metaAccounts` (ADR-0017). Identity is
+  neutralized, NOT content — dummy leads + the populated demo state stay, so Greg
+  shows a live-looking demo. Changes (all in leads/index.html):
+  (1) loadAgencyConfig() added near state setup; returns agency + user identity
+      DEFAULTED NEUTRAL (agency "Agence" / initials "A" / logo null; user name
+      "Utilisateur" / initials "U"). state.agency + state.user spread from it; the
+      non-identity agency config (pipeline stages) is untouched. Phase 2: the config
+      is backend-served (Open House tool), same surface as templates.
+  (2) De-branded values: "Magrey & Sons" → "Agence"; "M" → "A"; logo
+      "magrey_logo.PNG" → null (renderAgencyAvatar falls back to the "A" initials
+      avatar); user name "Greg" → "Utilisateur". The agency.name template-merge
+      ([Nom de l'agence] → state.agency.name) auto-propagates to "Agence".
+  (3) `cities` → `metaAccounts` (correctness, ADR-0017 — the switcher is a Meta-account
+      selector, not a geographic one): the field, currentCityId → currentMetaAccountId,
+      select-city → select-meta-account, data-city-id → data-meta-account-id, the
+      `.agency-city` class → `.agency-account`, the "Bureau actif" menu label → "Compte
+      Meta actif". The city-metaphor mapPin icon is replaced by the existing `home`
+      icon in the switcher line + menu items (no new SVG). The generic template ships
+      two accounts — "Compte Meta 1" / "Compte Meta 2" — demonstrating the multi-account
+      capability without any client's real account names. The unreachable "Toutes les
+      villes" fallback is dropped (the switcher always has a current account).
+  NOTE: user.email + the feedback mailto deliberately KEEP greg@lelabsocial.com —
+  feedback routes to Open House and the demo defaults to Greg (the demoer); a real
+  client instance overrides user.email per-client via the seam (Léo, v0.18.18). That
+  address is NOT client-branding and is intentionally retained, not grep-removed.
+  DEPLOY FOLLOW-UP: the deploy-only magrey_logo.PNG (never in the master zip) must be
+  removed from the GitHub Pages deploy — a deploy action, not a code edit.
+  Verified node --check on both app files + a jsdom harness (two doc click listeners +
+  a change listener, real bubbling events): switcher renders "Agence" + two Meta-account
+  items ("Compte Meta 1/2"), selecting account 2 sets currentMetaAccountId=2, avatar
+  shows the "A" initials (no logo), no "Magrey"/"Greg" name/"cities"/"ville" in live
+  code, dummy leads still present, list + dashboard still render.
+
   Open House Leads — v0.18.17
   Two on-device bug fixes (pure frontend / CSS; no backend, no new ADR). Both in
   leads/index.html:
@@ -867,7 +904,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .agency-city {
+  .agency-account {
     font-size: 12px;
     font-weight: 400;
     color: var(--text-secondary);
@@ -875,7 +912,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .agency-city svg {
+  .agency-account svg {
     width: 11px;
     height: 11px;
     display: inline-block;
@@ -3685,7 +3722,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.17";
+const APP_VERSION = "v0.18.18";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -3724,18 +3761,48 @@ const AGING_THRESHOLD_DAYS = 3;
 const TIMING_SHORT = { "Immédiatement": "Immédiat", "Dans les 6 prochains mois": "Sous 6 mois", "Plus de 6 mois": "6 mois +" };
 function timingShort(v) { return TIMING_SHORT[v] || v || "—"; }
 
+/* v0.18.18 (ADR-0028) — client-config seam. All client-specific identity
+   (agency name/initials/logo, Meta accounts, the logged-in user) is read
+   through this one accessor, parallel to ADR-0026's loadFormTemplates().
+   Phase 1: returns NEUTRAL DEFAULTS — the master repo is the generic / demo
+   template (agency "Agence", initials "A", no client logo, generic user name,
+   "Compte Meta 1/2"). A client instance overrides this config; in Phase 2 it is
+   fetched from the Open House backend tool (client identity is a record, not a
+   hardcoded value). De-brand neutralizes IDENTITY, not CONTENT — dummy leads +
+   the populated demo state stay (Greg shows a live-looking demo).
+   NOTE: user.email + the feedback mailto intentionally keep greg@lelabsocial.com
+   — feedback routes to Open House, and the demo defaults to Greg (the demoer);
+   a real client instance overrides user.email per-client via this seam (Léo,
+   v0.18.18). That address is NOT client-branding and is deliberately retained. */
+function loadAgencyConfig() {
+  return {
+    agency: {
+      id: 1,
+      name: "Agence",
+      initials: "A",
+      logo: null,  // null → renderAgencyAvatar falls back to initials
+      metaAccounts: [
+        { id: 1, label: "Compte Meta 1" },
+        { id: 2, label: "Compte Meta 2" },
+      ],
+      currentMetaAccountId: 1,
+    },
+    user: {
+      id: 1,
+      name: "Utilisateur",
+      email: "greg@lelabsocial.com",  // feedback → Open House; per-client override in Phase 2
+      role: "Manager",      // "Agent" | "Manager" | "Admin"
+      initials: "U",
+      tone: "#5B6DFF",      // neutral brand accent
+    },
+  };
+}
+const AGENCY_CONFIG = loadAgencyConfig();
+
 const state = {
-  // user + agency context
+  // user + agency context — identity fields seam-driven (loadAgencyConfig, ADR-0028).
   agency: {
-    id: 1,
-    name: "Magrey & Sons",
-    initials: "M",
-    logo: "magrey_logo.PNG",  // when present, img is used instead of initials
-    cities: [
-      { id: 1, name: "Paris" },
-      { id: 2, name: "Riviera" },
-    ],
-    currentCityId: 1,
+    ...AGENCY_CONFIG.agency,
 
     // Pipeline stages per lead type. Dynamic per agency (PROJECT_SUMMARY §"Custom
     // Pipeline Stages"): stored here, read by every UI element that deals with
@@ -3763,14 +3830,7 @@ const state = {
       ],
     },
   },
-  user: {
-    id: 1,
-    name: "Greg",
-    email: "greg@lelabsocial.com",
-    role: "Manager",      // "Agent" | "Manager" | "Admin"
-    initials: "G",
-    tone: "#5B6DFF",
-  },
+  user: { ...AGENCY_CONFIG.user },  // seam-driven (loadAgencyConfig, ADR-0028)
 
   // nav — active route
   route: "leads",  // "leads" | "dashboard" | "archives" | "corbeille" | "agents" | "campaigns" | "database" | "settings" | "help"
@@ -4410,10 +4470,10 @@ function renderAgencyAvatar(agency) {
 }
 
 function renderAgencySwitcher(agency) {
-  const currentCity = agency.cities.find(c => c.id === agency.currentCityId);
-  const cityLabel = currentCity
-    ? `${icon.mapPin()}${currentCity.name}`
-    : "Toutes les villes";
+  const currentAccount = agency.metaAccounts.find(a => a.id === agency.currentMetaAccountId);
+  const accountLabel = currentAccount
+    ? `${icon.home()}${currentAccount.label}`
+    : (agency.metaAccounts[0] ? `${icon.home()}${agency.metaAccounts[0].label}` : "");
   const isOpen = state.agencySwitcherOpen;
   return `
     <div class="agency-switcher-wrap">
@@ -4421,7 +4481,7 @@ function renderAgencySwitcher(agency) {
         ${renderAgencyAvatar(agency)}
         <div class="agency-text">
           <div class="agency-name">${agency.name}</div>
-          <div class="agency-city">${cityLabel}</div>
+          <div class="agency-account">${accountLabel}</div>
         </div>
         ${icon.chevronDown()}
       </div>
@@ -4431,19 +4491,19 @@ function renderAgencySwitcher(agency) {
 }
 
 function renderAgencyMenu(agency) {
-  const items = agency.cities.map(c => {
-    const active = c.id === agency.currentCityId;
+  const items = agency.metaAccounts.map(a => {
+    const active = a.id === agency.currentMetaAccountId;
     return `
-      <div class="agency-menu-item" data-action="select-city" data-city-id="${c.id}" data-active="${active}" role="menuitem">
-        ${icon.mapPin()}
-        <span>${c.name}</span>
+      <div class="agency-menu-item" data-action="select-meta-account" data-meta-account-id="${a.id}" data-active="${active}" role="menuitem">
+        ${icon.home()}
+        <span>${a.label}</span>
         ${active ? icon.check() : ""}
       </div>
     `;
   }).join("");
   return `
     <div class="agency-menu" role="menu">
-      <div class="agency-menu-label">Bureau actif</div>
+      <div class="agency-menu-label">Compte Meta actif</div>
       ${items}
     </div>
   `;
@@ -5936,8 +5996,8 @@ function renderContent() {
 
 /* The three known Meta secteur zones (V1_SCOPE §4). Bloc 4 paints the Paris
    map when every present secteur is one of these; otherwise the map collapses
-   to a bar-only "Autres secteurs" block (ADR-0012). For Magrey V1 every buyer
-   secteur is one of the three, so the map is always-on — the fallback earns
+   to a bar-only "Autres secteurs" block (ADR-0012). In the V1 demo dataset every
+   buyer secteur is one of the three, so the map is always-on — the fallback earns
    its keep at second-agency time (Phase 2). */
 /* Inlined from prototype/paris_arrondissements.svg (viewBox 500×400, stable
    ids arr-1..arr-20). The map paths + the Seine overlay. Painted at render
@@ -7043,10 +7103,10 @@ document.addEventListener("click", (e) => {
     case "toggle-user-menu":
       setState({ userMenuOpen: !state.userMenuOpen, agencySwitcherOpen: false });
       break;
-    case "select-city": {
-      const cityId = Number(target.getAttribute("data-city-id"));
+    case "select-meta-account": {
+      const metaAccountId = Number(target.getAttribute("data-meta-account-id"));
       setState({
-        agency: { ...state.agency, currentCityId: cityId },
+        agency: { ...state.agency, currentMetaAccountId: metaAccountId },
         agencySwitcherOpen: false,
       });
       break;
