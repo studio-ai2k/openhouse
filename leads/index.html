@@ -1,5 +1,35 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.16
+  On-device review corrections (pure frontend / layout; no backend, no new ADR).
+  THREE items, all in leads/index.html:
+  (1) Dropped the "Leads · Acquéreurs" H1 above the buyer/seller toggle. The control
+      band (renderLeadsBand) is now the top of the Leads page. renderLeadsTitle + its
+      .leads-title* CSS (base + mobile) removed; grep-clean of leads-title /
+      renderLeadsTitle in live code (header-comment history fine). document.title
+      (routeTitles) is unaffected — that's the browser tab title, separate from the
+      in-page H1; the topbar .page-title (routeTitles) is also untouched.
+  (2) Archives + Corbeille gained three DESKTOP-ONLY columns between Nom and the date:
+      Campagne (lead.campaign), Type (renderTypeChip → Acquéreur/Vendeur), Qualité
+      (renderQualiteChip → Prioritaire/Intéressant/Faible/Non évalué, reusing the
+      Leads score-chip + a new muted .score-chip--none). Desktop grid grew 3→6 cols
+      (Nom · Campagne · Type · Qualité · date · action); the ≤768px reflow hides the
+      three new columns (display:none) so mobile stays Nom + date + action exactly as
+      before. New .data-col--campagne / --type / --qualite classes, each with a CSS
+      rule (no orphans).
+  (3) Sidebar feedback CTA was still clipped at the bottom on iPad (the v0.18.15
+      inset-only padding didn't fix it). Root cause: the fixed 100vh sidebar flex
+      column with a flex:1 spacer pushed the card flush against the 100vh boundary,
+      so on a short viewport it sat under the home indicator / chrome. Fix: reserve
+      real bottom breathing room INSIDE the scroll area (28px + safe-area inset), give
+      the spacer a min-height gap, and make .sidebar-card flex-shrink:0 so its full
+      height (title + body + button) is always reachable — tall or short viewport.
+  Verified node --check on both app files + a matchMedia-shimmed full-render jsdom
+  harness (desktop + mobile): no leads-title H1 / band is the first child of the
+  Leads page; Archives/Corbeille show 6 columns on desktop with type + score chips,
+  and the three new columns are CSS-hidden in the ≤768px reflow; rows stay inert +
+  unsorted; the sidebar CTA renders whole with the structural guards in place. No new ADR.
+
   Open House Leads — v0.18.15
   Desktop chrome & harmonization pass (pure frontend / layout; no backend, no new
   ADR). NINE items, all in leads/index.html:
@@ -686,10 +716,17 @@
   .sidebar {
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border-divider);
-    /* v0.18.15 (item E) — bottom padding incorporates the iOS safe-area inset so
-       the feedback CTA (renderSidebarCard) at the sidebar's scroll end clears the
-       home indicator / browser chrome instead of being occluded. Pairs with D. */
-    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+    /* v0.18.16 (item 3, supersedes the v0.18.15 inset-only attempt) — the CTA was
+       still clipped at the bottom-left on iPad. Root cause: after the item-D shell
+       change the sidebar is a fixed 100vh flex column with overflow-y:auto and a
+       flex:1 spacer pushing the card flush against the 100vh boundary — so on a
+       SHORT viewport the card sat hard against the inset edge (occluded by the home
+       indicator / chrome), and inset-only padding didn't lift it into view. Fix:
+       always reserve real bottom breathing room INSIDE the scroll area (a concrete
+       base padding PLUS the safe-area inset), and keep the card non-shrinking (see
+       .sidebar-card / .sidebar-spacer below) so its full height is always reachable
+       whether the sidebar scrolls (tall viewport) or not (short viewport). */
+    padding: 20px 16px calc(28px + env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -930,7 +967,10 @@
   .nav-item--sub .nav-item-label { font-size: 13px; }
 
   /* Sidebar footer */
-  .sidebar-spacer { flex: 1; }
+  /* v0.18.16 (item 3) — flex:1 still pushes the card to the bottom, but a min-height
+     guarantees a visible gap above it even when content is short, and shrink:0 keeps
+     the card itself from being compressed when content is tall. */
+  .sidebar-spacer { flex: 1 1 auto; min-height: 20px; }
 
   /* v0.11.4 — inert "soon" nav items (V2 pages). Greyed, no pointer, with a
      "Bientôt" pill. Same dormant-but-visible language as the Vendeurs toggle. */
@@ -958,6 +998,10 @@
     border-radius: var(--r-md);
     background: var(--blue-soft);
     border: 1px solid rgba(91, 109, 255, 0.12);
+    /* v0.18.16 (item 3) — never compress the card; in a tall sidebar that scrolls,
+       a shrunk card would clip its own button. Combined with the sidebar's reserved
+       bottom padding, the full title + body + CTA is always reachable. */
+    flex-shrink: 0;
   }
   .sidebar-card-title {
     font-size: 13px;
@@ -2361,11 +2405,13 @@
   .archives-title { font-size: 20px; font-weight: 700; color: var(--text-strong); }
   .archives-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
 
-  /* The data-table grid: 3 columns — Nom · (Archivé/Supprimé) le · action(s).
-     (v0.18.15 item I — Secteur column dropped; generic for 3b.) */
+  /* The data-table grid (v0.18.16) — DESKTOP: 6 columns —
+     Nom · Campagne · Type · Qualité · (Archivé/Supprimé) le · action(s).
+     On mobile (≤768px) it reflows to Nom + action only (the three added
+     columns + date are hidden) — see the @media block below. */
   .data-table-head, .data-row {
     display: grid;
-    grid-template-columns: 2fr 1.2fr auto;
+    grid-template-columns: 1.8fr 1.4fr auto auto 1fr auto;
     align-items: center;
     gap: 14px;
   }
@@ -2375,17 +2421,28 @@
     font-size: 13px; font-weight: 500; color: var(--text-primary);
     letter-spacing: -0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  /* Per-column cell tokens aligned to the Leads body cells: date → --text-muted. */
+  /* Per-column cell tokens aligned to the Leads body cells. */
+  .data-col--campagne {
+    font-size: 13px; color: var(--text-body);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .data-col--type { font-size: 13px; }
+  .data-col--qualite { font-size: 13px; }
   .data-col--date { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
   .data-col--action { justify-self: end; }
   /* Corbeille rows carry two actions (Restaurer + Supprimer définitivement). */
   .data-col--action-pair { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  /* v0.18.16 — Qualité cell reuses the Leads score-chip; add the muted "none"
+     state (Non évalué) which the interactive cell never needed a background for. */
+  .score-chip--none { background: var(--surface-tint, #F1F1F4); color: var(--text-muted); }
+  .score-chip--none .score-chip-dot { background: #B6B3AC; }
   .archives-empty { padding: 40px 22px; text-align: center; }
   .archives-empty-title { font-size: 16px; font-weight: 600; color: var(--text-strong); }
   .archives-empty-body { font-size: 13px; color: var(--text-muted); margin-top: 6px; max-width: 420px; margin-left: auto; margin-right: auto; }
   @media (max-width: 768px) {
-    /* Simple reflowed table (NOT a per-lead card): hide the header, stack the
-       two data cells against a right-aligned action. */
+    /* Simple reflowed table (NOT a per-lead card): hide the header; the three
+       desktop-only columns (Campagne · Type · Qualité) are removed entirely, so
+       mobile stays Nom + date + action exactly as before v0.18.16. */
     .data-table-head { display: none; }
     .data-row {
       grid-template-columns: 1fr auto;
@@ -2395,6 +2452,9 @@
     .data-col--nom    { grid-area: nom; }
     .data-col--date   { grid-area: date; font-size: 13px; color: var(--text-muted); }
     .data-col--action { grid-area: action; align-self: center; }
+    .data-col--campagne,
+    .data-col--type,
+    .data-col--qualite { display: none; }
   }
   .leads-table-header {
     padding: 16px 22px;
@@ -3040,36 +3100,15 @@
 
   /* v0.10.3 — §10b toggle redesign (V11).
      Replaces: 4px top band, pill-shaped segmented toggle, and
-     context-chip meta row. New structure is three blocks stacked:
-       1. .leads-title       — H1 with active mode accented inline
-       2. .leads-mode-card   — slim split card, icon+label per half
-       3. .leads-meta-row    — context chip + "Mis à jour" timestamp
+     context-chip meta row. v0.18.15 — the page-top chrome is the control band
+     (renderLeadsBand): the buyer/seller pill on the left, Période + Campagne on
+     the right. v0.18.16 — the old "Leads · Acquéreurs" H1 (.leads-title) was
+     dropped; the band is now the top of the page. Below it:
+       1. .leads-mode-card   — slim split card, icon+label per half (in the band)
+       2. .leads-meta-row    — context chip + "Mis à jour" timestamp
      The --type-accent CSS custom properties (set on .leads root) are
      unchanged — KPI active card + untouched-card left bar continue
-     reading from them. Only the page-top chrome changes. */
-
-  /* Page title. Active mode is accented (picks up --type-accent)
-     and sits inline with a muted "Leads ·" prefix. */
-  .leads .leads-title {
-    display: flex;
-    align-items: baseline;
-    gap: 10px;
-    margin-bottom: 10px;
-    letter-spacing: -0.015em;
-  }
-  .leads .leads-title-prefix {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text-muted);
-    position: relative;
-    top: -2px;
-    letter-spacing: 0;
-  }
-  .leads .leads-title-mode {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--type-accent);
-  }
+     reading from them. */
 
   /* Split-card toggle — slim, natural width, left-aligned.
      Shorter than a KPI card (no count, just icon + label). Single
@@ -3482,8 +3521,6 @@
     .dash-head .leads-mode-card { display: grid; width: 100%; }
     .leads-band .leads-mode-half,
     .dash-head .leads-mode-half { min-width: 0; justify-content: center; }
-    .leads .leads-title-mode { font-size: 20px; }
-    .leads .leads-title-prefix { font-size: 12px; top: -1px; }
 
     .app-shell { grid-template-columns: 1fr; }
     .sidebar {
@@ -3604,7 +3641,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.15";
+const APP_VERSION = "v0.18.16";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -4863,22 +4900,6 @@ function renderLeadsModeCard(opts) {
   `;
 }
 
-/* Page title. Active mode is accented and inline with the "Leads ·"
-   prefix (was "Prospects ·" through v0.13.0; aligned to the product
-   name / nav / tab title at v0.13.1). Re-reads every render so mode
-   flips re-color the word.
-   v0.10.3 — replaces the old 4px top band as the mode-identity signal
-   at the top of the page. */
-function renderLeadsTitle() {
-  const modeLabel = state.leadType === "buyer" ? "Acquéreurs" : "Vendeurs";
-  return `
-    <h1 class="leads-title">
-      <span class="leads-title-prefix">Leads ·</span>
-      <span class="leads-title-mode">${modeLabel}</span>
-    </h1>
-  `;
-}
-
 /* Context chip: shows raw active-type count in words. Now lives in
    .leads-meta-row below the mode card. Grammar handles singular/plural.
    v0.10.3 — reshaped to match the muted outlined-chip style used
@@ -5197,6 +5218,14 @@ function renderSourceIcon(source) {
 function renderTypeChip(type) {
   const label = typeLabel(type);  // "Acquéreur" / "Vendeur"
   return `<span class="type-chip type-chip--${type}">${label}</span>`;
+}
+
+/* v0.18.16 — static quality (score) chip for the Archives/Corbeille Qualité
+   column. Mirrors the Leads score-chip treatment (Prioritaire / Intéressant /
+   Faible / Non évalué) but is non-interactive. Unknown/unset → "none". */
+function renderQualiteChip(score) {
+  const key = SCORE_VALUES.includes(score) ? score : "none";
+  return `<span class="score-chip score-chip--${key}"><span class="score-chip-dot"></span>${scoreLabel(key)}</span>`;
 }
 
 /* Verify badge (v0.10.1) — phone-verified quality signal in the drawer
@@ -5809,7 +5838,6 @@ function renderLeadsContent() {
   const typeCount = view.counts.typeCounts[state.leadType];
   return `
     <div class="leads ${modeClass}">
-      ${renderLeadsTitle()}
       ${renderLeadsBand()}
       <div class="leads-meta-row">
         ${renderLeadsContextChip(state.leadType, typeCount)}
@@ -6490,10 +6518,12 @@ function isMobile() {
 
 /* v0.18.11 (ADR-0022) — Archives view. The ONE surface that inverts isArchived:
    lists buyer leads where archived === true (V1 is buyer-only). Each row shows
-   identity + secteur + the archive date and a Restore action (restore-lead →
-   archived=false, archivedAt=null, lead reappears in the main list and every
-   counter). Reuses the leads-table-card chrome + .archives-* row styling; no new
-   visual language. Empty state when nothing is archived. */
+   identity + campaign + type + quality + the archive date and a Restore action
+   (restore-lead → archived=false, archivedAt=null, lead reappears in the main list
+   and every counter). Reuses the leads-table-card chrome + shared .data-* table
+   styling; no new visual language. On mobile the row collapses to Nom + action
+   (the campaign/type/quality/date columns are desktop-only). Empty state when
+   nothing is archived. */
 function renderArchives() {
   const archived = state.leads
     .filter(l => l.type === "buyer" && isArchived(l))
@@ -6507,6 +6537,9 @@ function renderArchives() {
     : `
       <div class="data-table-head" role="row">
         <div class="data-col data-col--nom">Nom</div>
+        <div class="data-col data-col--campagne">Campagne</div>
+        <div class="data-col data-col--type">Type</div>
+        <div class="data-col data-col--qualite">Qualité</div>
         <div class="data-col data-col--date">Archivé le</div>
         <div class="data-col data-col--action"></div>
       </div>
@@ -6533,6 +6566,9 @@ function renderArchiveRow(lead) {
         ${renderAvatar(lead.initials, lead.tone, 34)}
         <span class="data-row-name">${lead.name}</span>
       </div>
+      <div class="data-col data-col--campagne">${lead.campaign || "—"}</div>
+      <div class="data-col data-col--type">${renderTypeChip(lead.type)}</div>
+      <div class="data-col data-col--qualite">${renderQualiteChip(lead.score)}</div>
       <div class="data-col data-col--date">${formatLeadDateHuman(lead.archivedAt)}</div>
       <div class="data-col data-col--action">
         <button class="leads-table-btn" data-action="restore-lead" data-lead-id="${lead.id}" aria-label="Restaurer ${lead.name}">
@@ -6562,6 +6598,9 @@ function renderCorbeille() {
     : `
       <div class="data-table-head" role="row">
         <div class="data-col data-col--nom">Nom</div>
+        <div class="data-col data-col--campagne">Campagne</div>
+        <div class="data-col data-col--type">Type</div>
+        <div class="data-col data-col--qualite">Qualité</div>
         <div class="data-col data-col--date">Supprimé le</div>
         <div class="data-col data-col--action"></div>
       </div>
@@ -6588,6 +6627,9 @@ function renderCorbeilleRow(lead) {
         ${renderAvatar(lead.initials, lead.tone, 34)}
         <span class="data-row-name">${lead.name}</span>
       </div>
+      <div class="data-col data-col--campagne">${lead.campaign || "—"}</div>
+      <div class="data-col data-col--type">${renderTypeChip(lead.type)}</div>
+      <div class="data-col data-col--qualite">${renderQualiteChip(lead.score)}</div>
       <div class="data-col data-col--date">${formatLeadDateHuman(lead.deletedAt)}</div>
       <div class="data-col data-col--action data-col--action-pair">
         <button class="leads-table-btn" data-action="restore-from-corbeille" data-lead-id="${lead.id}" aria-label="Restaurer ${lead.name}">
