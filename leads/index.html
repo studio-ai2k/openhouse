@@ -1,5 +1,27 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.14
+  Lead lifecycle tri-state (active | archived | deleted) + recoverable delete +
+  Corbeille view + sub-nav reveal. Extends the v0.18.11 archivage model (ADR-0022)
+  with a second excluded state. New read-time predicates isActive / isArchived /
+  isDeleted (archived field unchanged; deleted + deletedAt added, both default at
+  read time → no seed migration). Every ACTIVE counter/list flipped from
+  !isArchived(l) to isActive(l) (the seven sites: buyerLeadCount, the bell Nouveau
+  badge, both typeCounts buyer+seller, computeLeadsView baseFiltered, the two buyer
+  slices, computeDashboardView); the Archives filter stays isArchived(l) (now also
+  excludes deleted via the helper). New "Supprimer ce lead" drawer-footer action
+  (soft delete → Corbeille); the footer is now a 3-state machine (active → Archiver
+  + Supprimer; archived → Restaurer + Supprimer; deleted → Restaurer only). New
+  Corbeille view MIRRORS Archives (reuses .archives-* + .leads-table-card; no new
+  table CSS) with two row actions: Restaurer + Supprimer définitivement. Corbeille
+  reveals as an indented sub-item under Archives only while the route is archives or
+  corbeille. Bulk-delete unified from hard- to SOFT-delete (→ Corbeille); the ONLY
+  hard delete in the app is now purge-lead ("Supprimer définitivement"). CSV export
+  reads computeLeadsView, so it is active-only for free. Verified node --check on
+  both app files + a matchMedia-shimmed full-render jsdom harness (desktop + mobile):
+  the tri-state exclusion invariant (archive AND delete each drop every active
+  counter by 1; restore/purge return to baseline). → ADR-0027.
+
   Open House Leads — v0.18.13
   Drawer footer polish (cosmetic, mobile-sensitive) + documentation absorption.
   Three footer items, no logic change: (A1) the mobile icon Légende now wraps
@@ -847,6 +869,11 @@
   }
   .nav-item[data-active="true"] .nav-item-label { font-weight: 600; color: var(--text-primary); }
   .nav-item[data-active="true"] svg { color: var(--text-primary); }
+  /* v0.18.14 (ADR-0027) — Corbeille sub-item revealed under Archives. Indented,
+     slightly smaller; reuses .nav-item so hover/active/routing all carry over. */
+  .nav-item--sub { height: 34px; padding-left: 32px; }
+  .nav-item--sub svg { width: 14px; height: 14px; }
+  .nav-item--sub .nav-item-label { font-size: 13px; }
 
   /* Sidebar footer */
   .sidebar-spacer { flex: 1; }
@@ -1627,7 +1654,7 @@
     border-top: 1px solid var(--border-subtle);
     background: var(--panel);
   }
-  .drawer-foot-actions { display: flex; justify-content: flex-end; }
+  .drawer-foot-actions { display: flex; justify-content: flex-end; gap: 10px; }
   .drawer-foot-legend {
     margin-top: 10px;
     padding-top: 10px;
@@ -1644,6 +1671,10 @@
   }
   .drawer-foot-btn:hover { background: var(--surface-tint); }
   .drawer-foot-btn--archive:hover { border-color: #C99A3E; color: #854F0B; }
+  /* v0.18.14 (ADR-0027) — danger variant for "Supprimer ce lead" (soft-delete to
+     Corbeille). Mirrors .leads-table-btn--danger's red; recoverable, not purge. */
+  .drawer-foot-btn--danger { color: #B91C1C; }
+  .drawer-foot-btn--danger:hover { background: #FEF2F2; border-color: #FCA5A5; }
 
   /* ── v0.11.2 — Centre d'action drawer body (3 tabs) ──────────────── */
   /* v0.14.0 — divider model (V1_SCOPE §2.3a): hairlines separate drawer
@@ -2232,6 +2263,9 @@
   .archives-row-name { font-weight: 600; color: var(--text-strong); }
   .archives-col--secteur, .archives-col--date { font-size: 14px; color: var(--text); }
   .archives-col--action { justify-self: end; }
+  /* v0.18.14 (ADR-0027) — Corbeille rows carry two actions (Restaurer + Supprimer
+     définitivement); the rest of the row reuses .archives-* unchanged. */
+  .archives-col--action-pair { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
   .archives-empty { padding: 40px 22px; text-align: center; }
   .archives-empty-title { font-size: 16px; font-weight: 600; color: var(--text-strong); }
   .archives-empty-body { font-size: 13px; color: var(--text-muted); margin-top: 6px; max-width: 420px; margin-left: auto; margin-right: auto; }
@@ -3428,7 +3462,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.13";
+const APP_VERSION = "v0.18.14";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -3516,7 +3550,7 @@ const state = {
   },
 
   // nav — active route
-  route: "leads",  // "leads" | "dashboard" | "archives" | "agents" | "campaigns" | "database" | "settings" | "help"
+  route: "leads",  // "leads" | "dashboard" | "archives" | "corbeille" | "agents" | "campaigns" | "database" | "settings" | "help"
 
   // v0.18 — Tableau de bord page-level filters (ADR-0012). Both scope every
   // bloc. periode presets match the Leads Filters panel exactly so the date
@@ -3876,12 +3910,21 @@ function leadTimeline(lead) {
   return lead.type === "seller" ? lead.sellingTimeline : lead.timeline;
 }
 
-/* v0.18.11 (ADR-0022) — archivage. A lead carries archived (bool) + archivedAt
-   (ISO|null); both default at READ time so the seed rows stay untouched (absent
-   = not archived). isArchived is the single predicate every counter / list /
-   breakdown filters on, so the "archived excluded everywhere" invariant has one
-   source of truth. The Archives view inverts it; archive/restore set the fields. */
-function isArchived(lead) { return !!lead.archived; }
+/* v0.18.14 (ADR-0027) — lead lifecycle, tri-state: active | archived | deleted.
+   Extends the v0.18.11 archivage model (ADR-0022) with a second excluded state.
+   A lead carries archived (bool) + archivedAt (ISO|null) AND deleted (bool) +
+   deletedAt (ISO|null); all default at READ time so the seed rows stay untouched
+   (absent = not archived, not deleted). Three predicates, one source of truth:
+     - isActive(lead)   → shown in the Leads list + every active counter
+     - isArchived(lead) → shown in Archives ONLY (archived but not deleted)
+     - isDeleted(lead)  → shown in Corbeille ONLY
+   No lead is ever in two buckets. Every ACTIVE counter/list filters isActive;
+   the Archives view filters isArchived; the Corbeille view filters isDeleted.
+   Soft-delete (Supprimer / bulk-delete) sets deleted; the ONLY hard removal from
+   state.leads is purge-lead ("Supprimer définitivement") in the Corbeille. */
+function isArchived(lead) { return !!lead.archived && !lead.deleted; }
+function isDeleted(lead)  { return !!lead.deleted; }
+function isActive(lead)   { return !lead.archived && !lead.deleted; }
 
 /* French formatter for the ISO createdAt field. Stored ISO (sortable),
    displayed French. When the backend lands and real timestamps come
@@ -4098,6 +4141,8 @@ const navGroups = [
 const routeTitles = {
   leads: "Leads",
   dashboard: "Tableau de bord",
+  archives: "Archives",
+  corbeille: "Corbeille",
   agents: "Agents",
   campaigns: "Campagnes",
   database: "Database",
@@ -4175,12 +4220,14 @@ function buyerLeadCount() {
   // V1 shows buyer leads only; badge reflects the live count (was hardcoded 24).
   // v0.18.11 (ADR-0022): archived leads aren't in the Leads list, so they're
   // not in the badge either.
-  return state.leads.filter(l => l.type === "buyer" && !isArchived(l)).length;
+  return state.leads.filter(l => l.type === "buyer" && isActive(l)).length;
 }
 
-function renderNavItem(item, active) {
+function renderNavItem(item, active, sub) {
   // v0.11.4 — soon items (V2 pages) are inert: no data-route, not focusable,
   // greyed, with a "Bientôt" tag. Live items keep normal button behaviour.
+  // v0.18.14 (ADR-0027) — sub:true renders an indented sub-item (Corbeille under
+  // Archives); same nav classes + data-route click path, just a modifier class.
   if (item.soon) {
     return `
       <li>
@@ -4197,7 +4244,7 @@ function renderNavItem(item, active) {
     : (item.badge ? `<span class="nav-item-badge">${item.badge}</span>` : "");
   return `
     <li>
-      <div class="nav-item" data-active="${active}" data-route="${item.id}" role="button" tabindex="0">
+      <div class="nav-item${sub ? " nav-item--sub" : ""}" data-active="${active}" data-route="${item.id}" role="button" tabindex="0">
         ${icon[item.icon]()}
         <span class="nav-item-label">${item.label}</span>
         ${badge}
@@ -4207,11 +4254,24 @@ function renderNavItem(item, active) {
 }
 
 function renderNavGroup(group, activeRoute) {
+  // v0.18.14 (ADR-0027) — Corbeille is NOT a flat nav peer; it reveals as an
+  // indented sub-item directly under Archives, and ONLY while the active route is
+  // archives or corbeille. Built by walking the group items and injecting the
+  // sub-item right after the archives entry when the reveal condition holds.
+  const showCorbeille = activeRoute === "archives" || activeRoute === "corbeille";
+  const corbeilleItem = { id: "corbeille", label: "Corbeille", icon: "trash" };
+  const itemsHtml = group.items.map(it => {
+    const self = renderNavItem(it, it.id === activeRoute);
+    if (it.id === "archives" && showCorbeille) {
+      return self + renderNavItem(corbeilleItem, activeRoute === "corbeille", true);
+    }
+    return self;
+  }).join("");
   return `
     <div class="nav-group">
       <div class="nav-section-label">${group.label}</div>
       <ul class="nav-list">
-        ${group.items.map(it => renderNavItem(it, it.id === activeRoute)).join("")}
+        ${itemsHtml}
       </ul>
     </div>
   `;
@@ -4358,7 +4418,7 @@ function renderTopbar() {
             // + backend persistence; that lands with the V1.5 backend. The bell
             // is display-only in V1 (no data-action). v0.18.11 (ADR-0022):
             // archived leads are off the Leads surface, so they're not counted.
-            const newCount = state.leads.filter(l => l.type === "buyer" && l.status === "nouveau" && !isArchived(l)).length;
+            const newCount = state.leads.filter(l => l.type === "buyer" && l.status === "nouveau" && isActive(l)).length;
             return `<button class="icon-btn" aria-label="${newCount} nouveau${newCount > 1 ? "x" : ""} lead${newCount > 1 ? "s" : ""}" title="${newCount} lead${newCount > 1 ? "s" : ""} en Nouveau">
             ${icon.bell()}
             ${newCount > 0 ? `<span class="notif-badge">${newCount}</span>` : ""}
@@ -4399,16 +4459,17 @@ function computeLeadsView() {
   // surface — they live only in the Archives view. So the context-chip totals
   // exclude them too, matching the list below.
   const typeCounts = {
-    buyer:  state.leads.filter(l => l.type === "buyer"  && !isArchived(l)).length,
-    seller: state.leads.filter(l => l.type === "seller" && !isArchived(l)).length,
+    buyer:  state.leads.filter(l => l.type === "buyer"  && isActive(l)).length,
+    seller: state.leads.filter(l => l.type === "seller" && isActive(l)).length,
   };
 
   // Apply type + search to get the set all tab/pipeline counts are based on.
-  // Archived excluded first (ADR-0022) — the single Leads-list choke point, so
-  // pagination, filters, export, and stage counts all inherit the exclusion.
+  // Non-active excluded first (ADR-0027: archived AND deleted) — the single
+  // Leads-list choke point, so pagination, filters, export, and stage counts
+  // all inherit the exclusion (CSV export reads computeLeadsView, so it too).
   const baseFiltered = state.leads.filter(l => {
     if (l.type !== type) return false;
-    if (isArchived(l)) return false;
+    if (!isActive(l)) return false;   // v0.18.14 — excludes archived AND deleted (ADR-0027)
     if (!search) return true;
     const hay = `${l.name} ${l.email} ${l.zone || ""}`.toLowerCase();
     return hay.includes(search);
@@ -5278,7 +5339,7 @@ function renderFilterPanel() {
   // the raw value (it can contain spaces/accents → encode for the attribute,
   // decode in the handler). v0.18.11 (ADR-0022): derive options from the live
   // non-archived set so the panel doesn't offer a value only an archived lead has.
-  const buyers = state.leads.filter(l => l.type === "buyer" && !isArchived(l));
+  const buyers = state.leads.filter(l => l.type === "buyer" && isActive(l));
   const distinct = (pick) => [...new Set(buyers.map(pick).filter(Boolean))];
   const orderBy = (vals, order) => {
     const known = order.filter(o => vals.includes(o));
@@ -5675,7 +5736,7 @@ function computeDashboardView(periode, campagne) {
   // v0.18.11 (ADR-0022): archived leads excluded at the base, so every dashboard
   // figure downstream (KPIs, scores, statuts, secteurs, budgets, timing,
   // caractéristiques, type de projet, top-5) drops accordingly — one choke point.
-  let leads = state.leads.filter(l => l.type === "buyer" && !isArchived(l));
+  let leads = state.leads.filter(l => l.type === "buyer" && isActive(l));
   const allBuyers = leads;
   if (!demoNonParis && campagne) leads = leads.filter(l => l.campaign === campagne);
   const scoped = leads.filter(l => leadInPeriode(l, periode));
@@ -6093,7 +6154,7 @@ function renderDashFilters() {
   // Campaign options from the live buyer seed, with counts. Plus the demo
   // non-Paris option (demonstrates the map fallback on fabricated data).
   // v0.18.11 (ADR-0022): exclude archived so campaign counts match the dashboard.
-  const buyers = state.leads.filter(l => l.type === "buyer" && !isArchived(l));
+  const buyers = state.leads.filter(l => l.type === "buyer" && isActive(l));
   const campCounts = {};
   buyers.forEach(l => { if (l.campaign) campCounts[l.campaign] = (campCounts[l.campaign] || 0) + 1; });
   const campOpts = Object.entries(campCounts)
@@ -6144,6 +6205,7 @@ function renderRouteContent() {
   if (state.route === "leads") return renderLeadsContent();
   if (state.route === "dashboard") return renderDashboard();
   if (state.route === "archives") return renderArchives();
+  if (state.route === "corbeille") return renderCorbeille();
   return renderRouteComingSoon();
 }
 
@@ -6226,6 +6288,65 @@ function renderArchiveRow(lead) {
       <div class="archives-col archives-col--action">
         <button class="leads-table-btn" data-action="restore-lead" data-lead-id="${lead.id}" aria-label="Restaurer ${lead.name}">
           ${icon.rotateCcw ? icon.rotateCcw() : ""}<span>Restaurer</span>
+        </button>
+      </div>
+    </div>`;
+}
+
+/* v0.18.14 (ADR-0027) — Corbeille view. The Corbeille is to deleted leads what
+   Archives is to archived: the ONE surface that lists isDeleted(lead). It MIRRORS
+   renderArchives — same .leads-table-card chrome + .archives-* row styling, no new
+   table CSS — differing only in: the title/sub copy, the date column ("Supprimé le"
+   / lead.deletedAt), the filter (isDeleted), the empty-state copy, and TWO row
+   actions (Restaurer → active; Supprimer définitivement → the only hard delete). */
+function renderCorbeille() {
+  const deleted = state.leads
+    .filter(l => l.type === "buyer" && isDeleted(l))
+    .sort((a, b) => new Date(b.deletedAt || 0) - new Date(a.deletedAt || 0));
+
+  const body = deleted.length === 0
+    ? `<div class="archives-empty">
+         <div class="archives-empty-title">Aucun lead supprimé</div>
+         <div class="archives-empty-body">Les leads que vous supprimez depuis la liste ou la fiche arrivent ici. Vous pouvez les restaurer, ou les supprimer définitivement.</div>
+       </div>`
+    : `
+      <div class="archives-head" role="row">
+        <div class="archives-col archives-col--nom">Nom</div>
+        <div class="archives-col archives-col--secteur">Secteur recherché</div>
+        <div class="archives-col archives-col--date">Supprimé le</div>
+        <div class="archives-col archives-col--action"></div>
+      </div>
+      <div class="archives-list" role="rowgroup">
+        ${deleted.map(renderCorbeilleRow).join("")}
+      </div>`;
+
+  return `
+    <div class="archives">
+      <div class="archives-intro">
+        <div class="archives-title">Corbeille</div>
+        <div class="archives-sub">${deleted.length} lead${deleted.length === 1 ? "" : "s"} supprimé${deleted.length === 1 ? "" : "s"} · récupérables ou à supprimer définitivement</div>
+      </div>
+      <div class="leads-table-card">
+        ${body}
+      </div>
+    </div>`;
+}
+
+function renderCorbeilleRow(lead) {
+  return `
+    <div class="archives-row" role="row">
+      <div class="archives-col archives-col--nom">
+        ${renderAvatar(lead.initials, lead.tone, 34)}
+        <span class="archives-row-name">${lead.name}</span>
+      </div>
+      <div class="archives-col archives-col--secteur">${lead.secteur || "—"}</div>
+      <div class="archives-col archives-col--date">${formatLeadDateHuman(lead.deletedAt)}</div>
+      <div class="archives-col archives-col--action archives-col--action-pair">
+        <button class="leads-table-btn" data-action="restore-from-corbeille" data-lead-id="${lead.id}" aria-label="Restaurer ${lead.name}">
+          ${icon.rotateCcw ? icon.rotateCcw() : ""}<span>Restaurer</span>
+        </button>
+        <button class="leads-table-btn leads-table-btn--danger" data-action="purge-lead" data-lead-id="${lead.id}" aria-label="Supprimer définitivement ${lead.name}">
+          ${icon.trash ? icon.trash() : ""}<span>Supprimer définitivement</span>
         </button>
       </div>
     </div>`;
@@ -6476,9 +6597,19 @@ function renderDrawer() {
       ${activeTab === "infos" ? `
       <div class="drawer-foot">
         <div class="drawer-foot-actions">
-          ${isArchived(lead)
-            ? `<button class="drawer-foot-btn" data-action="restore-lead" data-lead-id="${lead.id}">${icon.rotateCcw()}<span>Restaurer le lead</span></button>`
-            : `<button class="drawer-foot-btn drawer-foot-btn--archive" data-action="archive-lead" data-lead-id="${lead.id}">${icon.archive()}<span>Archiver le lead</span></button>`}
+          ${(() => {
+            // v0.18.14 (ADR-0027) — footer state-machine across the lifecycle.
+            //   active   → Archiver + Supprimer
+            //   archived → Restaurer + Supprimer (archive→delete is valid)
+            //   deleted  → Restaurer ONLY (no Archiver, no Supprimer — it's already
+            //              in the Corbeille; permanent purge lives there)
+            const restore = `<button class="drawer-foot-btn" data-action="${isDeleted(lead) ? "restore-from-corbeille" : "restore-lead"}" data-lead-id="${lead.id}">${icon.rotateCcw()}<span>Restaurer le lead</span></button>`;
+            const archive = `<button class="drawer-foot-btn drawer-foot-btn--archive" data-action="archive-lead" data-lead-id="${lead.id}">${icon.archive()}<span>Archiver le lead</span></button>`;
+            const del = `<button class="drawer-foot-btn drawer-foot-btn--danger" data-action="delete-lead" data-lead-id="${lead.id}">${icon.trash()}<span>Supprimer ce lead</span></button>`;
+            if (isDeleted(lead))  return restore;
+            if (isArchived(lead)) return restore + del;
+            return archive + del;
+          })()}
         </div>
         ${isMobile() ? `<div class="drawer-foot-legend">${renderIconLegend()}</div>` : ""}
       </div>` : ""}
@@ -6847,16 +6978,20 @@ document.addEventListener("click", (e) => {
       break;
     }
     case "bulk-delete": {
-      // v0.16 — destructive bulk op: native confirm() guards the action.
-      // Selection clears on success (the leads being acted on no longer
-      // exist); select mode stays on so the user can continue working.
+      // v0.18.14 (ADR-0027) — SOFT bulk delete. Was a hard removal from
+      // state.leads with a "définitive" confirm; now mirrors bulk-archive's
+      // in-place loop, setting deleted=true + deletedAt=now so the leads move to
+      // the Corbeille (recoverable). The ONLY hard delete in the app is now
+      // purge-lead ("Supprimer définitivement") in the Corbeille. Selection
+      // clears on success; select mode stays on (matches bulk-archive).
       const n = state.selectedLeadIds.length;
       if (n === 0) break;
-      const msg = `Supprimer ${n} lead${n === 1 ? "" : "s"} ? Cette action est définitive.`;
+      const msg = `Déplacer ${n} lead${n === 1 ? "" : "s"} vers la corbeille ?`;
       if (!window.confirm(msg)) break;
       const ids = new Set(state.selectedLeadIds);
-      const nextLeads = state.leads.filter(l => !ids.has(l.id));
-      setState({ leads: nextLeads, selectedLeadIds: [], bulkMenu: null, leadsPage: 1 });
+      const now = new Date().toISOString();
+      state.leads.forEach(l => { if (ids.has(l.id)) { l.deleted = true; l.deletedAt = now; } });
+      setState({ selectedLeadIds: [], bulkMenu: null, leadsPage: 1 });
       break;
     }
     case "bulk-archive": {
@@ -6911,6 +7046,48 @@ document.addEventListener("click", (e) => {
         lead.archivedAt = null;
         setState({ leadsPage: 1 });
       }
+      break;
+    }
+    case "delete-lead": {
+      // v0.18.14 (ADR-0027) — SOFT delete from the drawer footer. Mirrors
+      // archive-lead but sets deleted=true + deletedAt=now: the lead moves to the
+      // Corbeille (recoverable), NOT removed from state.leads. Recoverable, so the
+      // confirm copy is "déplacé vers la corbeille", never "définitive". It drops
+      // out of every active counter (the isActive choke point + guards) like an
+      // archived lead. Close the drawer (the lead it shows is now off the active
+      // surface); reset to page 1.
+      const id = Number(target.getAttribute("data-lead-id"));
+      const lead = state.leads.find(l => l.id === id);
+      if (lead) {
+        if (!window.confirm("Supprimer ce lead ? Il sera déplacé vers la corbeille.")) break;
+        lead.deleted = true;
+        lead.deletedAt = new Date().toISOString();
+        setState({ drawer: null, selectedLeadIds: state.selectedLeadIds.filter(x => x !== id), leadsPage: 1 });
+      }
+      break;
+    }
+    case "restore-from-corbeille": {
+      // v0.18.14 (ADR-0027) — restore a deleted lead from the Corbeille: clear the
+      // deleted fields so the lead returns to ACTIVE (mirrors restore-lead, which
+      // clears the archived fields). It reappears in the active list and every
+      // counter. A restored lead is active, not re-archived.
+      const id = Number(target.getAttribute("data-lead-id"));
+      const lead = state.leads.find(l => l.id === id);
+      if (lead) {
+        lead.deleted = false;
+        lead.deletedAt = null;
+        setState({ drawer: null, leadsPage: 1 });
+      }
+      break;
+    }
+    case "purge-lead": {
+      // v0.18.14 (ADR-0027) — the ONLY hard delete in the app. Permanently removes
+      // the lead from state.leads (irreversible). Lives in the Corbeille only;
+      // PERMANENT confirm copy. Mirrors the old bulk-delete removal pattern.
+      const id = Number(target.getAttribute("data-lead-id"));
+      if (!window.confirm("Supprimer définitivement ? Cette action est irréversible.")) break;
+      const nextLeads = state.leads.filter(l => l.id !== id);
+      setState({ leads: nextLeads, drawer: null, selectedLeadIds: state.selectedLeadIds.filter(x => x !== id), leadsPage: 1 });
       break;
     }
     case "set-filter-statut": {
