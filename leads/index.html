@@ -1,5 +1,37 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.17
+  Two on-device bug fixes (pure frontend / CSS; no backend, no new ADR). Both in
+  leads/index.html:
+  (1) BUG 1 — sidebar CTA cut off at the bottom on iPad (the v0.18.16 inset fix was
+      incomplete). Root cause: .app-shell, .sidebar and .main are height:100vh, and
+      on iPad Safari 100vh is the LARGE viewport (it does NOT subtract the browser
+      chrome), so the fixed frame renders taller than the visible window and the
+      "Un retour à partager ?" CTA is pushed below the real lower edge. Fix: add a
+      `height: 100dvh` override immediately after each `height: 100vh` on .app-shell,
+      .sidebar and .main — the SAME progressive-enhancement pair the mobile drawer
+      already uses (100vh fallback for no-dvh browsers, 100dvh for modern mobile).
+      dvh tracks the chrome so the frame matches the visible window and the CTA lands
+      on the real bottom edge. The overflow model is UNCHANGED (.content stays the
+      scroll container; the item-D pull-refresh-wobble fix is intact) and the sidebar
+      bottom padding + safe-area inset are kept.
+  (2) BUG 2 — Archives + Corbeille tables looked broken (uneven columns, headers not
+      over their data). Root cause: the shared `.data-table-head, .data-row` grid was
+      `1.8fr 1.4fr auto auto 1fr auto` — Type and Qualité were bare content-width
+      `auto` columns floating with large gaps, so TYPE/QUALITÉ/date headers didn't sit
+      above their cells. Fix: rebalance the desktop track sizing to
+      `1.6fr 1.4fr 0.9fr 1fr 1fr auto` — Type fits the Acquéreur/Vendeur chip, Qualité
+      fits the longer Prioritaire/Non évalué chip + dot, the date gets its own track,
+      Nom/Campagne tightened — so each header aligns over its cell with even spacing.
+      One grid rule is shared by head + rows, so the single edit fixes both. The
+      ≤768px mobile block is UNTOUCHED: Campagne/Type/Qualité stay display:none and
+      the row stays Nom + action only. Applies to both Archives and Corbeille (shared
+      .data-* classes).
+  Verified node --check on both app files + a matchMedia-shimmed full-render jsdom
+  harness (desktop + mobile): both tables render with 6 desktop columns / 3 hidden on
+  mobile, rows inert (a bubbling click does not change route), real bubbling
+  click/change events handled without throwing.
+
   Open House Leads — v0.18.16
   On-device review corrections (pure frontend / layout; no backend, no new ADR).
   THREE items, all in leads/index.html:
@@ -707,7 +739,12 @@
        the whole shell GROW with content so the DOCUMENT scrolled (sidebar + main
        moved together → iPad pull-refresh wobble). Now the shell is pinned to the
        viewport and the scroll is handed to .content alone. */
+    /* v0.18.17 (BUG 1) — 100vh is the LARGE viewport on iPad Safari (ignores the
+       browser chrome), so the fixed frame renders taller than the visible window
+       and the sidebar CTA falls below the fold. 100dvh tracks the chrome; 100vh
+       stays as the no-dvh fallback (same progressive pair the drawer uses). */
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     background: var(--frame);
   }
@@ -733,6 +770,7 @@
     position: sticky;
     top: 0;
     height: 100vh;
+    height: 100dvh; /* v0.18.17 (BUG 1) — match the dvh frame so the CTA lands on the real bottom edge on iPad */
     overflow-y: auto;
   }
 
@@ -1043,6 +1081,7 @@
        its first, non-scrolling child (pins by layout, not by sticky); .content
        below it owns the scroll. */
     height: 100vh;
+    height: 100dvh; /* v0.18.17 (BUG 1) — dvh frame matches the visible window on iPad Safari */
     overflow: hidden;
   }
 
@@ -2411,7 +2450,12 @@
      columns + date are hidden) — see the @media block below. */
   .data-table-head, .data-row {
     display: grid;
-    grid-template-columns: 1.8fr 1.4fr auto auto 1fr auto;
+    /* v0.18.17 (BUG 2) — even, proportional desktop tracks so each header sits over
+       its cell. Was `1.8fr 1.4fr auto auto 1fr auto`: Type/Qualité were bare `auto`
+       (content-width, floating with large gaps) so TYPE/QUALITÉ/date headers didn't
+       align to their data. Type fits the "Acquéreur"/"Vendeur" chip; Qualité fits the
+       longer "Prioritaire"/"Non évalué" chip + dot; date gets its own track. */
+    grid-template-columns: 1.6fr 1.4fr 0.9fr 1fr 1fr auto;
     align-items: center;
     gap: 14px;
   }
@@ -3641,7 +3685,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.16";
+const APP_VERSION = "v0.18.17";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
