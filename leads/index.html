@@ -1,5 +1,51 @@
 <!doctype html>
 <!--
+  Open House Leads — v0.18.15
+  Desktop chrome & harmonization pass (pure frontend / layout; no backend, no new
+  ADR). NINE items, all in leads/index.html:
+  (A) Shared top control band on Leads AND Tableau de bord — same left/right rhythm
+      as dash-head: the Acquéreurs/Vendeurs pill hard-left, Période + Campagne
+      dropdowns grouped right (Leads reuses .dash-filters/.dash-filter so the
+      selects are byte-identical to the Dashboard's). No KPI/summary card.
+  (B) The pill relocated + harmonized: renderLeadsModeCard gains an { inert } param.
+      On Leads it's functional (toggles state.leadType); on the Dashboard it renders
+      the SAME buyer-active/seller-greyed state but INERT (buyer half is a non-actioned
+      element — consistency placeholder, V2-functional). Core pill CSS de-scoped from
+      .leads to the band contexts (.leads-band, .dash-head) so both pages style it.
+  (C) Date dimension moved OUT of the Filters panel onto the band. New band state
+      leadsPeriode + leadsCampagne (functional). computeLeadsView reads leadsPeriode
+      (date MATH byte-identical, only the SOURCE moved) + a campaign AND-filter.
+      set-leads-periode / set-leads-campagne on the change listener, leadsPage→1 on
+      change. Panel Date group + the date-filter handler removed; the Filtrer badge
+      no longer counts date or campaign. CSV (reads computeLeadsView) inherits the band.
+  (D) App-shell scroll refactor (iPad pull-refresh wobble): .app-shell height:100vh
+      + overflow:hidden; .main height:100vh + overflow:hidden; .content overflow-y:auto
+      — only the content scrolls, the sidebar no longer moves. Topbar pins as the
+      non-scrolling first flex child of .main (its now-redundant sticky left as-is).
+  (E) Sidebar feedback-CTA clip: .sidebar bottom padding incorporates
+      env(safe-area-inset-bottom) so renderSidebarCard clears the iOS safe area.
+  (F) Topbar search hidden on ALL routes (was Leads-only): .topbar .search
+      { display:none } unconditional. DORMANT — renderSearch markup kept for V2.
+  (G) Table search left-aligned + widened: .leads-search margin-right:auto + 320px
+      (tablet 260px). It's the page's only search now (topbar search dormant).
+  (H) Icon legend moved out of the drawer footer to UNDER the leads table, mobile-only
+      (matches current mobile-only row-icon visibility), short one-row labels, restyled
+      off .drawer-section. Frees the drawer footer so Archiver/Supprimer anchor at the
+      bottom. renderIconLegend gains a placement param; drawer-foot-legend retired.
+  (I) Archives + Corbeille harmonized to the Leads table design via shared base classes
+      (.data-table-head / .data-row / .data-col) carrying the source-of-truth visual
+      tokens authored ONCE (grouped with the Leads table). Desktop-identical; mobile is
+      a simple reflowed table (NOT the Leads per-lead card). Rows stay inert + unsorted;
+      row buttons keep .leads-table-btn / --danger. Secteur column dropped (3 cols:
+      Nom · date · action). No .archives-* class orphaned.
+  Verified node --check on both app files + a matchMedia-shimmed full-render jsdom
+  harness (desktop + mobile, real bubbling clicks on the two document listeners +
+  change events on the band selects): band on Leads + Dashboard, Dashboard pill inert
+  + styled, date-AND-campaign-from-band invariant, badge ignores band dims, legend
+  mobile-only under the table + gone from the drawer, Archives/Corbeille styled via
+  .data-* with the 3-col generic layout, inert + unsorted, secteur dropped, topbar
+  search hidden on a non-Leads route. No new ADR.
+
   Open House Leads — v0.18.14
   Lead lifecycle tri-state (active | archived | deleted) + recoverable delete +
   Corbeille view + sub-nav reveal. Extends the v0.18.11 archivage model (ADR-0022)
@@ -627,7 +673,12 @@
   .app-shell {
     display: grid;
     grid-template-columns: var(--sidebar-w) 1fr;
-    min-height: 100vh;
+    /* v0.18.15 (item D) — fixed-height viewport. Was min-height:100vh, which let
+       the whole shell GROW with content so the DOCUMENT scrolled (sidebar + main
+       moved together → iPad pull-refresh wobble). Now the shell is pinned to the
+       viewport and the scroll is handed to .content alone. */
+    height: 100vh;
+    overflow: hidden;
     background: var(--frame);
   }
 
@@ -635,7 +686,10 @@
   .sidebar {
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border-divider);
-    padding: 20px 16px;
+    /* v0.18.15 (item E) — bottom padding incorporates the iOS safe-area inset so
+       the feedback CTA (renderSidebarCard) at the sidebar's scroll end clears the
+       home indicator / browser chrome instead of being occluded. Pairs with D. */
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -941,6 +995,11 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+    /* v0.18.15 (item D) — the fixed frame for the content column. The topbar is
+       its first, non-scrolling child (pins by layout, not by sticky); .content
+       below it owns the scroll. */
+    height: 100vh;
+    overflow: hidden;
   }
 
   /* ───────── Top header ───────── */
@@ -1173,12 +1232,14 @@
   }
   .search input::placeholder { color: var(--text-muted); }
 
-  /* Topbar search suppression on the Leads route.
-     The topbar search is reserved for future global search. On Leads, the
-     page-level search IS the search — so the topbar one hides to avoid two
-     competing affordances. Non-Leads routes keep it visible.
-     Uses body[data-route] which is set in render(). Base rule, not media-query. */
-  body[data-route="leads"] .topbar .search { display: none; }
+  /* Topbar search suppression — ALL routes (v0.18.15, item F).
+     DORMANT: the topbar search markup + handler are kept (renderSearch), reserved
+     for a real global search in V2 — but until that exists it has no function on
+     any route, so it's hidden everywhere to avoid a dead affordance. On Leads the
+     page-level table search is the search; on other routes there's no search yet.
+     Was previously hidden on the Leads route only (body[data-route="leads"]); the
+     route qualifier is dropped. Base rule, not media-query. */
+  .topbar .search { display: none; }
 
   /* User menu */
   .user-menu-wrap {
@@ -1312,6 +1373,9 @@
     flex: 1;
     padding: 0 32px 32px;
     min-height: 0;
+    /* v0.18.15 (item D) — the ONLY scroll container now. Scrolling here does not
+       move the sidebar (which keeps its own overflow-y:auto) or the topbar. */
+    overflow-y: auto;
   }
 
   /* Step-1 empty state (will be removed in Step 2) */
@@ -1655,13 +1719,9 @@
     background: var(--panel);
   }
   .drawer-foot-actions { display: flex; justify-content: flex-end; gap: 10px; }
-  .drawer-foot-legend {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border-divider);
-  }
-  .drawer-foot-legend .icon-legend { gap: 6px 16px; }
-  .drawer-foot-legend .icon-legend-label { font-size: 12px; color: var(--text-muted); }
+  /* v0.18.15 (item H) — .drawer-foot-legend retired: the icon legend moved out of
+     the drawer footer to under the leads table, freeing the footer so the
+     Archiver/Supprimer buttons anchor at the bottom on mobile. */
   .drawer-foot-btn {
     display: inline-flex; align-items: center; gap: 8px;
     height: 38px; padding: 0 16px;
@@ -1895,6 +1955,24 @@
     color: var(--text-muted);
   }
 
+  /* v0.18.15 (item H) — icon legend in its new home UNDER the leads table.
+     A subtle one-row footnote: a "Légende" label + the four icon/label pairs.
+     Not drawer-section chrome — light, muted, sits quietly beneath the table. */
+  .leads-legend {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-top: 12px;
+    padding: 0 4px;
+  }
+  .leads-legend-label {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--text-muted);
+  }
+  .leads-legend .icon-legend-label { font-size: 12px; color: var(--text-muted); }
+  .leads-legend .icon-legend-row .attr-icon svg { width: 15px; height: 15px; }
+
   /* ═══════════════════════════════════════════════════════════════
      LEADS PAGE — v0.7.0 controls + card list
      Base rules only. Mobile-specific rules live in the @media block
@@ -1918,7 +1996,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    width: 240px;
+    /* v0.18.15 (item G) — table search is the page's only search now (topbar
+       search is dormant). Left-align it: margin-right:auto pushes Sélectionner /
+       Filtrer / Exporter to the right. Widened 240→320 so it reads as primary. */
+    width: 320px;
+    margin-right: auto;
     max-width: 100%;
     height: 36px;
     padding: 0 12px;
@@ -2234,52 +2316,85 @@
        - Rows are CSS grid with named column widths so body + header align.
        - Selected row gets a soft tint matching the drawer-open lead.
        - Last row has no hairline to avoid a double border with the card. */
+  /* ═══════════════════════════════════════════════════════════════
+     v0.18.15 (item I) — SHARED TABLE TOKENS. The Leads table is the source of
+     truth for table design (header type, row padding, borders, cell colors).
+     These tokens are authored ONCE here, on grouped selectors that cover BOTH
+     the Leads table (.leads-table-head / .leads-row / its cells) AND the data
+     tables (.data-table-head / .data-row / .data-col used by Archives + Corbeille),
+     so a future change to the table look moves all three together.
+     Each table sets its OWN grid track on top (Leads: 7-track machine elsewhere;
+     Archives/Corbeille: the 3-track .data-row grid below). We share the visual
+     vocabulary, not the dual-render machine — Archives/Corbeille stay single-
+     render, inert (no row-click), and unsorted. On mobile they reflow to a simple
+     table (NOT the Leads per-lead card). */
+
+  /* Header type/treatment — source-of-truth values (was .leads-table-head only). */
+  .leads-table-head,
+  .data-table-head {
+    padding: 12px 22px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  /* Row padding + hairline — source-of-truth values. Leads adds cursor/hover via
+     its own .leads-row rules (rows are clickable); .data-row stays INERT. */
+  .leads-row,
+  .data-row {
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .data-row:last-child { border-bottom: 0; }
+
   .leads-table-card {
     background: var(--panel);
     border: 1px solid var(--border-subtle);
     border-radius: 16px;
     overflow: hidden;
   }
-  /* v0.18.11 (ADR-0022) — Archives view. Reuses the table-card shell; its own
-     4-col grid (Nom · Secteur · Archivé le · Restaurer). Collapses on mobile. */
+
+  /* Archives + Corbeille intro block. */
   .archives-intro { margin-bottom: 16px; }
   .archives-title { font-size: 20px; font-weight: 700; color: var(--text-strong); }
   .archives-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-  .archives-head, .archives-row {
+
+  /* The data-table grid: 3 columns — Nom · (Archivé/Supprimé) le · action(s).
+     (v0.18.15 item I — Secteur column dropped; generic for 3b.) */
+  .data-table-head, .data-row {
     display: grid;
-    grid-template-columns: 2fr 1.4fr 1fr auto;
+    grid-template-columns: 2fr 1.2fr auto;
     align-items: center;
     gap: 14px;
-    padding: 12px 22px;
   }
-  .archives-head {
-    font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
-    color: var(--text-muted);
-    border-bottom: 1px solid var(--border-subtle);
+  .data-col--nom { display: flex; align-items: center; gap: 10px; }
+  /* Nom cell matches the Leads --nom treatment. */
+  .data-row-name {
+    font-size: 13px; font-weight: 500; color: var(--text-primary);
+    letter-spacing: -0.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .archives-row { border-bottom: 1px solid var(--border-subtle); }
-  .archives-row:last-child { border-bottom: none; }
-  .archives-col--nom { display: flex; align-items: center; gap: 10px; }
-  .archives-row-name { font-weight: 600; color: var(--text-strong); }
-  .archives-col--secteur, .archives-col--date { font-size: 14px; color: var(--text); }
-  .archives-col--action { justify-self: end; }
-  /* v0.18.14 (ADR-0027) — Corbeille rows carry two actions (Restaurer + Supprimer
-     définitivement); the rest of the row reuses .archives-* unchanged. */
-  .archives-col--action-pair { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  /* Per-column cell tokens aligned to the Leads body cells: date → --text-muted. */
+  .data-col--date { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .data-col--action { justify-self: end; }
+  /* Corbeille rows carry two actions (Restaurer + Supprimer définitivement). */
+  .data-col--action-pair { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
   .archives-empty { padding: 40px 22px; text-align: center; }
   .archives-empty-title { font-size: 16px; font-weight: 600; color: var(--text-strong); }
   .archives-empty-body { font-size: 13px; color: var(--text-muted); margin-top: 6px; max-width: 420px; margin-left: auto; margin-right: auto; }
   @media (max-width: 768px) {
-    .archives-head { display: none; }
-    .archives-row {
+    /* Simple reflowed table (NOT a per-lead card): hide the header, stack the
+       two data cells against a right-aligned action. */
+    .data-table-head { display: none; }
+    .data-row {
       grid-template-columns: 1fr auto;
-      grid-template-areas: "nom action" "secteur action" "date action";
+      grid-template-areas: "nom action" "date action";
       row-gap: 4px;
     }
-    .archives-col--nom     { grid-area: nom; }
-    .archives-col--secteur { grid-area: secteur; font-size: 13px; color: var(--text-muted); }
-    .archives-col--date    { grid-area: date; font-size: 13px; color: var(--text-muted); }
-    .archives-col--action  { grid-area: action; align-self: center; }
+    .data-col--nom    { grid-area: nom; }
+    .data-col--date   { grid-area: date; font-size: 13px; color: var(--text-muted); }
+    .data-col--action { grid-area: action; align-self: center; }
   }
   .leads-table-header {
     padding: 16px 22px;
@@ -2497,19 +2612,12 @@
       minmax(124px, 1.15fr) /* Statut                         */
       minmax(86px,  0.85fr);/* Score                          */
   }
-  .leads-table-head {
-    padding: 12px 22px 10px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text-muted);
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--border-subtle);
-  }
   .leads-table-body { display: block; }
+  /* v0.18.15 (item I) — the Leads head padding/font/border tokens now live in the
+     shared grouped rule (.leads-table-head, .data-table-head) above; this
+     standalone rule keeps only the 7-track grid (defined just above) + nothing
+     else. The .leads-row rule below keeps only Leads-specific behaviour. */
   .leads-row {
-    padding: 14px 22px;
-    border-bottom: 1px solid var(--border-subtle);
     cursor: pointer;
     transition: background 80ms ease;
   }
@@ -2968,21 +3076,27 @@
      card visually, two halves separated by a 1px vertical divider.
      Active half is filled with type-accent-bg; inactive half stays
      white with muted content. */
-  .leads .leads-mode-card {
+  /* v0.18.15 — pill base rules de-scoped from .leads to the band contexts
+     (.leads-band on Leads, .dash-head on the Dashboard) so the relocated pill
+     is styled identically on both pages. The Dashboard pill is inert (item B,
+     intent 3) but shares this exact treatment. Height/radius/border are tuned
+     to the dash-filter <select> family (item 2) so the three controls read as one. */
+  .leads-band .leads-mode-card,
+  .dash-head .leads-mode-card {
     display: inline-grid;
     grid-template-columns: 1fr auto 1fr;
     background: var(--panel);
-    border: 1px solid var(--border-subtle);
+    border: 1px solid var(--border-strong);
     border-radius: var(--r-sm);
     overflow: hidden;
     box-shadow: var(--shadow-xs);
-    margin-bottom: 10px;
   }
-  .leads .leads-mode-half {
+  .leads-band .leads-mode-half,
+  .dash-head .leads-mode-half {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    padding: 10px 18px;
+    padding: 9px 16px;
     background: transparent;
     border: 0;
     font-family: inherit;
@@ -2993,13 +3107,19 @@
     cursor: pointer;
     white-space: nowrap;
     transition: background 120ms ease, color 120ms ease;
-    min-width: 160px;  /* prevent the halves from collapsing below icon+label */
+    min-width: 150px;  /* prevent the halves from collapsing below icon+label */
   }
-  .leads .leads-mode-half:hover:not([aria-selected="true"]) {
+  .leads-band .leads-mode-half:hover:not([aria-selected="true"]),
+  .dash-head .leads-mode-half:hover:not([aria-selected="true"]) {
     background: var(--surface-tint);
     color: var(--text-primary);
   }
-  .leads .leads-mode-half-ico {
+  /* Inert variant (Dashboard): the buyer half renders as a non-actioned element,
+     so no hover affordance — it's a consistency placeholder, not a control. */
+  .dash-head .leads-mode-half--inert,
+  .dash-head .leads-mode-half--inert:hover { cursor: default; background: transparent; }
+  .leads-band .leads-mode-half-ico,
+  .dash-head .leads-mode-half-ico {
     width: 22px;
     height: 22px;
     border-radius: 999px;
@@ -3010,17 +3130,20 @@
     flex-shrink: 0;
     transition: background 120ms ease, color 120ms ease;
   }
-  .leads .leads-mode-half-ico svg {
+  .leads-band .leads-mode-half-ico svg,
+  .dash-head .leads-mode-half-ico svg {
     width: 12px;
     height: 12px;
     stroke-width: 2;
   }
-  .leads .leads-mode-half[aria-selected="true"] {
+  .leads-band .leads-mode-half[aria-selected="true"],
+  .dash-head .leads-mode-half[aria-selected="true"] {
     background: var(--type-accent-bg);
     color: var(--type-accent);
     font-weight: 600;
   }
-  .leads .leads-mode-half[aria-selected="true"] .leads-mode-half-ico {
+  .leads-band .leads-mode-half[aria-selected="true"] .leads-mode-half-ico,
+  .dash-head .leads-mode-half[aria-selected="true"] .leads-mode-half-ico {
     background: var(--type-accent-strong);
     color: var(--panel);
   }
@@ -3092,7 +3215,14 @@
   .dash-head {
     display: flex; align-items: flex-start; justify-content: space-between;
     gap: 18px; flex-wrap: wrap; margin-bottom: 22px;
+    /* v0.18.15 — the inert pill (item B) reads --type-accent*; the Dashboard is
+       buyer-only by construction, so expose the buyer (blue) palette here. */
+    --type-accent:        var(--accent-blue);
+    --type-accent-bg:     var(--blue-soft);
+    --type-accent-strong: var(--accent-blue);
   }
+  /* The pill sits above .dash-sub in the left title slot; give them breathing room. */
+  .dash-head-title { display: flex; flex-direction: column; gap: 10px; }
   .dash-sub { font-size: 13px; color: var(--text-secondary); }
   .dash-filters { display: flex; align-items: center; gap: 18px; }
   .dash-filter { display: flex; align-items: center; gap: 9px; }
@@ -3108,6 +3238,15 @@
     background-repeat: no-repeat; background-position: right 12px center;
   }
   .dash-filter select:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 1px; }
+
+  /* v0.18.15 — Leads top control band (item A). Same left/right rhythm as
+     .dash-head: pill anchors HARD-LEFT, the Période + Campagne dropdowns group
+     RIGHT (reusing .dash-filters/.dash-filter so the selects are byte-identical
+     to the Dashboard's). Two weighted ends, not centered, not all-grouped. */
+  .leads-band {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 18px; flex-wrap: wrap; margin-bottom: 18px;
+  }
 
   .dash-content { display: flex; flex-direction: column; gap: 18px; max-width: 1180px; }
   .dash-block {
@@ -3268,6 +3407,7 @@
   }
   @media (max-width: 768px) {
     .dash-head { flex-direction: column; align-items: stretch; gap: 14px; }
+    .leads-band { flex-direction: column; align-items: stretch; gap: 14px; }
     .dash-filters { flex-direction: column; align-items: stretch; gap: 14px; width: 100%; }
     .dash-filter { width: 100%; flex-direction: column; align-items: stretch; gap: 6px; }
     .dash-filter select { width: 100%; }
@@ -3281,9 +3421,9 @@
     .content { padding: 0 24px 24px; }
     .search { width: 240px; }
 
-    /* Leads Layer 2 — tablet narrows search. Stage cards handled by
-       progressive-hide rules below (see .stage-card--prio-N). */
-    .leads-search { width: 200px; }
+    /* Leads Layer 2 — tablet narrows search (v0.18.15: 320→260, was 240→200).
+       Stage cards handled by progressive-hide rules below. */
+    .leads-search { width: 260px; }
   }
 
   /* v0.10 — stage KPI progressive-hide breakpoints.
@@ -3338,8 +3478,10 @@
 
     /* v0.10.3 — V11 mode card goes full-width on mobile so both
        halves get generous tap targets; title scales down. */
-    .leads .leads-mode-card { display: grid; width: 100%; }
-    .leads .leads-mode-half { min-width: 0; justify-content: center; }
+    .leads-band .leads-mode-card,
+    .dash-head .leads-mode-card { display: grid; width: 100%; }
+    .leads-band .leads-mode-half,
+    .dash-head .leads-mode-half { min-width: 0; justify-content: center; }
     .leads .leads-title-mode { font-size: 20px; }
     .leads .leads-title-prefix { font-size: 12px; top: -1px; }
 
@@ -3462,7 +3604,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.14";
+const APP_VERSION = "v0.18.15";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -3562,6 +3704,15 @@ const state = {
   dashPeriode: null,
   dashCampagne: null,
 
+  // v0.18.15 — Leads top control band (item A/C). Band-level date + campaign
+  // scoping, mirroring the dashboard pair. These live on the band, NOT in the
+  // Filters panel — the panel no longer carries a Date group, and the Filtrer
+  // badge does not count them.
+  //   leadsPeriode  ∈ null | "today" | "7d" | "30d" | "month"  (null = Toutes les dates)
+  //   leadsCampagne ∈ null | <campaign string>                 (null = all campaigns)
+  leadsPeriode: null,
+  leadsCampagne: null,
+
   // v0.18 — Vue rapide chips (ADR-0014). The Leads page accepts filter state
   // richer than the Filters panel can express (contactPreference, age
   // threshold, campaign). Dashboard tiles + campaign carry-over push a chip
@@ -3615,11 +3766,12 @@ const state = {
   leadsPage: 1,
   // v0.15 — Filters panel (Greg brief: filters pulled into V1, BRIEF_STATE §5).
   // Statut is driven by `filterTab` (shared with the stage cards — one source of
-  // truth); Score · Date · Budget · Secteur · Timing are the panel dimensions,
-  // applied on top in computeLeadsView. date ∈ null | "today" | "7d" | "30d" |
-  // "month". budget/secteur/timing are multi-select arrays (OR within a
-  // dimension, AND across dimensions), same shape as score (v0.18.11, ADR-0009 + CHANGELOG).
-  filters: { score: [], date: null, budget: [], secteur: [], timing: [] },
+  // truth); Score · Budget · Secteur · Timing are the panel dimensions, applied
+  // on top in computeLeadsView. budget/secteur/timing are multi-select arrays (OR
+  // within a dimension, AND across dimensions), same shape as score (v0.18.11,
+  // ADR-0009). v0.18.15 (item C): Date left the panel — date scoping now lives on
+  // the control band (state.leadsPeriode), not here.
+  filters: { score: [], budget: [], secteur: [], timing: [] },
   filterPanelOpen: false,
   // Bulk-select mode (v0.9.0). selectionMode toggles the checkbox column on.
   // selectedLeadIds persists across filter changes — the intent is "act on these",
@@ -3782,7 +3934,7 @@ function applyVueRapide(chip) {
     route: "leads",
     leadType: "buyer",
     filterTab: "all",
-    filters: { score: [], date: null, budget: [], secteur: [], timing: [] },
+    filters: { score: [], budget: [], secteur: [], timing: [] },
     leadsSearch: "",
     vueRapide: chips,
     leadsPage: 1,
@@ -4393,6 +4545,10 @@ function renderAvatarStack(team, more) {
   return `<div class="avatar-stack">${avatars}${moreTag}</div>`;
 }
 
+/* DORMANT (v0.18.15, item F) — topbar search. Hidden on ALL routes via the
+   `.topbar .search { display:none }` base rule until V2 ships a real global
+   search. Markup + the input are KEPT intact (no handler today) so global search
+   can light up by removing the one CSS rule. Do not delete. */
 function renderSearch() {
   return `
     <div class="search">
@@ -4518,14 +4674,19 @@ function computeLeadsView() {
   // {Prioritaire} + {Rive gauche} + {Immédiatement} shows only leads matching
   // all three. Empty array = dimension inactive (passes everything).
   const fScore   = state.filters.score   || [];
-  const fDate    = state.filters.date    || null;
+  // v0.18.15 (item C) — the date dimension now reads from the band (leadsPeriode),
+  // NOT the Filters panel. The date MATH below is byte-for-byte unchanged; only
+  // the SOURCE moved. The preset vocabulary maps 1:1 (today/7d/30d/month/null).
+  const fPeriode = state.leadsPeriode    || null;
+  // v0.18.15 (item A) — Campagne is a functional band dimension on Leads. null = all.
+  const fCampagne = state.leadsCampagne  || null;
   const fBudget  = state.filters.budget  || [];
   const fSecteur = state.filters.secteur || [];
   const fTiming  = state.filters.timing  || [];
   const dateFloor = (() => {
-    if (fDate !== "7d" && fDate !== "30d") return null;
+    if (fPeriode !== "7d" && fPeriode !== "30d") return null;
     const d = new Date();
-    d.setDate(d.getDate() - (fDate === "7d" ? 7 : 30));
+    d.setDate(d.getDate() - (fPeriode === "7d" ? 7 : 30));
     d.setHours(0, 0, 0, 0);
     return d;
   })();
@@ -4535,14 +4696,15 @@ function computeLeadsView() {
       const s = SCORE_VALUES.includes(l.score) ? l.score : "none";  // unset/unknown → "none"
       if (!fScore.includes(s)) return false;
     }
+    if (fCampagne && l.campaign !== fCampagne)                     return false;
     if (fBudget.length  && !fBudget.includes(l.budget))            return false;
     if (fSecteur.length && !fSecteur.includes(l.secteur))          return false;
     if (fTiming.length  && !fTiming.includes(leadTimeline(l)))     return false;
-    if (fDate) {
+    if (fPeriode) {
       if (!l.createdAt) return false;
-      if (fDate === "today")      { if (l.createdAt.slice(0, 10) !== todayIso)     return false; }
-      else if (fDate === "month") { if (l.createdAt.slice(0, 7)  !== monthPrefix)  return false; }
-      else if (dateFloor)         { if (new Date(l.createdAt) < dateFloor)         return false; }
+      if (fPeriode === "today")      { if (l.createdAt.slice(0, 10) !== todayIso)     return false; }
+      else if (fPeriode === "month") { if (l.createdAt.slice(0, 7)  !== monthPrefix)  return false; }
+      else if (dateFloor)            { if (new Date(l.createdAt) < dateFloor)         return false; }
     }
     return true;
   });
@@ -4646,22 +4808,38 @@ function exportLeadsCsv() {
    data-action is unchanged (set-lead-type) — handler is the same as
    the old toggle-tab path. Slimmer than KPI cards: no count, counts
    live in the KPI row below. */
-function renderLeadsModeCard() {
+function renderLeadsModeCard(opts) {
+  // v0.18.15 — relocated into the top control band on both pages (item A/B).
+  //   Leads:     functional — buyer half toggles state.leadType (as before).
+  //   Dashboard: inert (opts.inert) — same buyer-active / seller-greyed STATE,
+  //              but the buyer half is a non-actioned element so it toggles
+  //              nothing (intent 3: consistency placeholder, functional in V2).
+  const inert = !!(opts && opts.inert);
   const half = (typeKey, iconKey, label) => {
     const active   = state.leadType === typeKey;
     // V1: Vendeurs is present but disabled — visible roadmap promise, not a
-    // working surface. Inert (no data-action so the click handler never
-    // fires) + "Bientôt disponible" tooltip. Seller code paths stay in file.
+    // working surface. Inert (data-action="seller-soon" is a no-op handler) +
+    // "Bientôt disponible" tooltip. Seller code paths stay in file.
     const disabled = typeKey === "seller";
     if (disabled) {
       return `
       <div class="leads-mode-half leads-mode-half--disabled"
            role="tab" aria-selected="false" aria-disabled="true"
-           data-action="seller-soon"
+           ${inert ? "" : `data-action="seller-soon"`}
            title="Bientôt disponible">
         <span class="leads-mode-half-ico">${icon[iconKey]()}</span>
         <span>${label}</span>
         <span class="leads-mode-half-soon">Bientôt</span>
+      </div>
+    `;
+    }
+    // Buyer half: a live button on Leads; a non-actioned div on the Dashboard.
+    if (inert) {
+      return `
+      <div class="leads-mode-half leads-mode-half--inert"
+           role="tab" aria-selected="${active}">
+        <span class="leads-mode-half-ico">${icon[iconKey]()}</span>
+        <span>${label}</span>
       </div>
     `;
     }
@@ -4718,9 +4896,10 @@ function renderLeadsContextChip(typeKey, count) {
   `;
 }
 
-/* In-page search. Distinct from topbar search (topbar is hidden on the
-   Leads route via body[data-route="leads"] CSS — see §topbar-search
-   suppression near the top of the stylesheet). Input events delegated. */
+/* In-page table search. Distinct from the topbar search, which is DORMANT and
+   hidden on all routes (v0.18.15, item F — `.topbar .search { display:none }`).
+   This is the page's only search; it left-aligns and widens (item G). Input
+   events delegated. */
 function renderLeadsSearch() {
   const value = state.leadsSearch.replace(/"/g, "&quot;");
   return `
@@ -5173,24 +5352,49 @@ function renderAttributeIcons(lead) {
 /* v0.11.5 — mobile-only legend explaining the card attribute icons. Shown as
    the last bloc of the drawer Infos tab on mobile (the icons only appear on
    the mobile card). Mirrors renderAttributeIcons — keep the two in sync. */
-function renderIconLegend() {
+/* Icon legend for the attribute icons shown on lead rows/cards.
+   placement:
+     "table"  (v0.18.15, item H) — subtle one-row footnote UNDER the leads table.
+              Short 1–2-word labels so the four pairs sit on one line; light muted
+              type; NO .drawer-section chrome. Rendered mobile-only (matches the
+              current mobile-only row-icon visibility).
+     "drawer" (legacy) — full sentences in a .drawer-section. No longer called in
+              V1 (the legend left the drawer footer at v0.18.15) but kept so the
+              drawer can show it again without a rewrite. */
+function renderIconLegend(placement) {
+  const where = placement || "drawer";
+  const tableLabels = {
+    fileText: "Note",
+    check:    "Tél. vérifié",
+    bell:     "Urgent",
+    star:     "Critères",
+  };
   const items = [
-    { iconKey: "fileText", label: "Une note a été ajoutée" },
-    { iconKey: "check",    label: "Téléphone vérifié" },
-    { iconKey: "bell",     label: "À contacter tout de suite" },
-    { iconKey: "star",     label: "Critères de recherche spécifiques" },
+    { iconKey: "fileText", drawer: "Une note a été ajoutée" },
+    { iconKey: "check",    drawer: "Téléphone vérifié" },
+    { iconKey: "bell",     drawer: "À contacter tout de suite" },
+    { iconKey: "star",     drawer: "Critères de recherche spécifiques" },
   ];
+  const rows = items.map(it => {
+    const label = where === "table" ? tableLabels[it.iconKey] : it.drawer;
+    return `
+          <div class="icon-legend-row">
+            <span class="attr-icon attr-icon--on">${icon[it.iconKey]()}</span>
+            <span class="icon-legend-label">${label}</span>
+          </div>`;
+  }).join("");
+
+  if (where === "table") {
+    return `
+    <div class="leads-legend" aria-label="Légende des icônes">
+      <span class="leads-legend-label">Légende</span>
+      <div class="icon-legend">${rows}</div>
+    </div>`;
+  }
   return `
     <div class="drawer-section">
       <div class="drawer-section-label">Légende des icônes</div>
-      <div class="icon-legend">
-        ${items.map(it => `
-          <div class="icon-legend-row">
-            <span class="attr-icon attr-icon--on">${icon[it.iconKey]()}</span>
-            <span class="icon-legend-label">${it.label}</span>
-          </div>
-        `).join("")}
-      </div>
+      <div class="icon-legend">${rows}</div>
       <p class="icon-legend-hint">Une icône noire = information présente ; grisée = absente.</p>
     </div>`;
 }
@@ -5283,18 +5487,18 @@ function renderBulkScoreMenu() {
 }
 
 /* v0.15 — Filters panel (Greg brief: filters into V1, BRIEF_STATE §5). A
-   dropdown under the Filtrer button with three groups: Statut · Score · Date.
+   dropdown under the Filtrer button. Groups: Statut · Score · Budget · Secteur ·
+   Timing. (v0.18.15, item C: the Date group moved OUT to the control band —
+   date scoping now reads state.leadsPeriode, not a panel dimension.)
    - Statut: single-select, options Tous + the 4 buyer stages. Drives the SAME
-     state.filterTab as the stage cards (one source of truth). "Perdu"/"today"
-     aren't offered here — Perdu is terminal, "today" is the quick card + the
-     Date "Aujourd'hui" preset.
+     state.filterTab as the stage cards (one source of truth). "Perdu" isn't
+     offered here — it's terminal.
    - Score: multi-select chips (Prioritaire/Intéressant/Faible/Non évalué) → state.filters.score.
-   - Date: single-select presets (Tous/Aujourd'hui/7j/30j/Ce mois) → state.filters.date.
+   - Budget · Secteur · Timing: multi-select, values-from-data (ADR-0009).
    All of these refine computeLeadsView; pagination then slices the result. */
 function renderFilterPanel() {
   const stages = (state.agency.pipeline.buyer || []);
   const fScore   = state.filters.score   || [];
-  const fDate    = state.filters.date    || null;
   const fBudget  = state.filters.budget  || [];
   const fSecteur = state.filters.secteur || [];
   const fTiming  = state.filters.timing  || [];
@@ -5319,18 +5523,10 @@ function renderFilterPanel() {
                     data-action="toggle-filter-score" data-score="${o.v}"><span class="score-chip-dot score-dot--${o.mod}"></span>${o.label}${on ? `<span class="filter-check">${icon.check()}</span>` : ""}</button>`;
   }).join("");
 
-  const dateOpts = [
-    { v: "all",   label: "Tous" },
-    { v: "today", label: "Aujourd'hui" },
-    { v: "7d",    label: "7 jours" },
-    { v: "30d",   label: "30 jours" },
-    { v: "month", label: "Ce mois" },
-  ];
-  const dateHtml = dateOpts.map(o => {
-    const on = (o.v === "all") ? !fDate : fDate === o.v;
-    return `<button class="filter-opt${on ? " filter-opt--on" : ""}" role="option" aria-selected="${on}"
-                    data-action="set-filter-date" data-date="${o.v}">${o.label}</button>`;
-  }).join("");
+  // v0.18.15 (item C) — the Date dimension left the Filters panel. Date scoping
+  // now lives on the top control band (state.leadsPeriode); the panel no longer
+  // builds a Date group, the badge no longer counts it, and the old date-filter
+  // click handler was removed.
 
   // v0.18.11 (ADR-0009) — Budget · Secteur · Timing, all multi-select. Option
   // values come FROM the live buyer lead set (values-from-data, ADR-0021's
@@ -5363,7 +5559,7 @@ function renderFilterPanel() {
   const timingHtml  = multiHtml(timingVals,  fTiming,  "toggle-filter-timing",  "timing", timingShort);
 
   const anyActive = (state.filterTab !== "all" && state.filterTab !== "lost")
-    || fScore.length || fDate || fBudget.length || fSecteur.length || fTiming.length;
+    || fScore.length || fBudget.length || fSecteur.length || fTiming.length;
 
   return `
     <div class="leads-filter-panel" role="dialog" aria-label="Filtres">
@@ -5386,10 +5582,6 @@ function renderFilterPanel() {
       <div class="filter-group">
         <div class="filter-group-label">Timing</div>
         <div class="filter-opts">${timingHtml}</div>
-      </div>
-      <div class="filter-group">
-        <div class="filter-group-label">Date</div>
-        <div class="filter-opts">${dateHtml}</div>
       </div>
       <div class="filter-panel-foot">
         <button class="filter-reset${anyActive ? "" : " filter-reset--off"}" data-action="clear-filters"${anyActive ? "" : " disabled"}>Réinitialiser</button>
@@ -5432,11 +5624,12 @@ function renderLeadsTable(view) {
   // v0.18.11 (ADR-0009) — Budget · Secteur · Timing join the count.
   const statutActive     = state.filterTab !== "all" && state.filterTab !== "lost";
   const scoreActive      = (state.filters.score   || []).length > 0;
-  const dateActive       = !!state.filters.date;
+  // v0.18.15 (item C) — date is no longer a panel dimension, so the Filtrer badge
+  // does not count it (it's a band control). Same for Campagne.
   const budgetActive     = (state.filters.budget  || []).length > 0;
   const secteurActive    = (state.filters.secteur || []).length > 0;
   const timingActive     = (state.filters.timing  || []).length > 0;
-  const activeDims       = (statutActive ? 1 : 0) + (scoreActive ? 1 : 0) + (dateActive ? 1 : 0)
+  const activeDims       = (statutActive ? 1 : 0) + (scoreActive ? 1 : 0)
                          + (budgetActive ? 1 : 0) + (secteurActive ? 1 : 0) + (timingActive ? 1 : 0);
   const filterBadge      = activeDims
     ? `<span class="leads-table-btn-badge">${activeDims}</span>`
@@ -5550,13 +5743,66 @@ function renderLeadsTable(view) {
   `;
 }
 
+/* v0.18.15 — Leads band filters (item A/C). Période + Campagne dropdowns,
+   styled identically to the Dashboard's (reuse .dash-filters/.dash-filter).
+   - Période is FUNCTIONAL: scopes computeLeadsView by createdAt (item C).
+   - Campagne is FUNCTIONAL (resolved post-launch): scopes the list by campaign,
+     options counted from the live ACTIVE buyer set. No __demo_non_paris__ here
+     (that's a Dashboard-only demo affordance). Both are band controls — they do
+     NOT appear in the Filtrer panel or its badge. */
+function renderLeadsBandFilters() {
+  const periodes = [
+    { v: "", label: "Toutes les dates" },
+    { v: "today", label: "Aujourd'hui" },
+    { v: "7d", label: "7 derniers jours" },
+    { v: "30d", label: "30 derniers jours" },
+    { v: "month", label: "Ce mois" },
+  ];
+  const periodeSel = periodes.map(p =>
+    `<option value="${p.v}"${(state.leadsPeriode || "") === p.v ? " selected" : ""}>${p.label}</option>`
+  ).join("");
+  // Campaign options from the live active buyer seed, with counts (mirrors the
+  // dashboard's exclude-archived rule so counts match what the list can show).
+  const buyers = state.leads.filter(l => l.type === "buyer" && isActive(l));
+  const campCounts = {};
+  buyers.forEach(l => { if (l.campaign) campCounts[l.campaign] = (campCounts[l.campaign] || 0) + 1; });
+  const campOpts = Object.entries(campCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, n]) => `<option value="${name}"${state.leadsCampagne === name ? " selected" : ""}>${name} (${n})</option>`)
+    .join("");
+  return `
+    <div class="dash-filters">
+      <div class="dash-filter">
+        <label for="leads-periode">Période</label>
+        <select id="leads-periode" data-action="set-leads-periode">${periodeSel}</select>
+      </div>
+      <div class="dash-filter">
+        <label for="leads-campagne">Campagne</label>
+        <select id="leads-campagne" data-action="set-leads-campagne">
+          <option value=""${!state.leadsCampagne ? " selected" : ""}>Toutes les campagnes</option>
+          ${campOpts}
+        </select>
+      </div>
+    </div>`;
+}
+
+/* v0.18.15 — Leads top control band (item A). Pill hard-left (functional here),
+   Période + Campagne grouped right. Same rhythm as the Dashboard's dash-head. */
+function renderLeadsBand() {
+  return `
+    <div class="leads-band">
+      ${renderLeadsModeCard()}
+      ${renderLeadsBandFilters()}
+    </div>`;
+}
+
 /* Leads page composition. Wrapped in a .leads root that carries a
    mode-buyer or mode-seller class — every type-accent CSS rule reads
    from custom properties set by that class, so the whole surface
    re-palettes in one place when the user flips the mode.
-   v0.10.3: top chrome replaced (see renderLeadsTitle + renderLeadsModeCard).
-   No 4px top band anymore; mode identity carried by the accented
-   title word + the accented half of the mode card. */
+   v0.18.15: top chrome is now the control band (renderLeadsBand): the
+   Acquéreurs/Vendeurs pill on the left, Période + Campagne dropdowns on
+   the right. The page title + meta-row stay above the band. */
 function renderLeadsContent() {
   const view      = computeLeadsView();
   const modeClass = `mode-${state.leadType}`;
@@ -5564,7 +5810,7 @@ function renderLeadsContent() {
   return `
     <div class="leads ${modeClass}">
       ${renderLeadsTitle()}
-      ${renderLeadsModeCard()}
+      ${renderLeadsBand()}
       <div class="leads-meta-row">
         ${renderLeadsContextChip(state.leadType, typeCount)}
         <span class="leads-updated-meta">Mis à jour il y a 2 min</span>
@@ -5575,6 +5821,10 @@ function renderLeadsContent() {
            the chips light up again with no rewiring if the tiles return (Phase 2). */ ""}
       ${renderVueRapideChips()}
       ${renderLeadsTable(view)}
+      ${/* v0.18.15 (item H) — icon legend's home is here, under the table, mobile-only
+           (matches current mobile-only row-icon visibility). Moved out of the drawer
+           footer so the Archiver/Supprimer buttons anchor at the drawer bottom. */ ""}
+      ${isMobile() ? renderIconLegend("table") : ""}
     </div>
   `;
 }
@@ -6188,6 +6438,7 @@ function renderDashboard() {
     <div class="dashboard">
       <div class="dash-head">
         <div class="dash-head-title">
+          ${renderLeadsModeCard({ inert: true })}
           <div class="dash-sub">Vue d'ensemble des leads acquéreurs${dv.demoNonParis ? " · données démo (hors Paris)" : ""}</div>
         </div>
         ${renderDashFilters()}
@@ -6254,18 +6505,17 @@ function renderArchives() {
          <div class="archives-empty-body">Les leads que vous archivez depuis la liste ou la fiche apparaissent ici. Vous pouvez les restaurer à tout moment.</div>
        </div>`
     : `
-      <div class="archives-head" role="row">
-        <div class="archives-col archives-col--nom">Nom</div>
-        <div class="archives-col archives-col--secteur">Secteur recherché</div>
-        <div class="archives-col archives-col--date">Archivé le</div>
-        <div class="archives-col archives-col--action"></div>
+      <div class="data-table-head" role="row">
+        <div class="data-col data-col--nom">Nom</div>
+        <div class="data-col data-col--date">Archivé le</div>
+        <div class="data-col data-col--action"></div>
       </div>
-      <div class="archives-list" role="rowgroup">
+      <div role="rowgroup">
         ${archived.map(renderArchiveRow).join("")}
       </div>`;
 
   return `
-    <div class="archives">
+    <div>
       <div class="archives-intro">
         <div class="archives-title">Archives</div>
         <div class="archives-sub">${archived.length} lead${archived.length === 1 ? "" : "s"} archivé${archived.length === 1 ? "" : "s"} · exclus de la liste, du tableau de bord et de l'export</div>
@@ -6278,14 +6528,13 @@ function renderArchives() {
 
 function renderArchiveRow(lead) {
   return `
-    <div class="archives-row" role="row">
-      <div class="archives-col archives-col--nom">
+    <div class="data-row" role="row">
+      <div class="data-col data-col--nom">
         ${renderAvatar(lead.initials, lead.tone, 34)}
-        <span class="archives-row-name">${lead.name}</span>
+        <span class="data-row-name">${lead.name}</span>
       </div>
-      <div class="archives-col archives-col--secteur">${lead.secteur || "—"}</div>
-      <div class="archives-col archives-col--date">${formatLeadDateHuman(lead.archivedAt)}</div>
-      <div class="archives-col archives-col--action">
+      <div class="data-col data-col--date">${formatLeadDateHuman(lead.archivedAt)}</div>
+      <div class="data-col data-col--action">
         <button class="leads-table-btn" data-action="restore-lead" data-lead-id="${lead.id}" aria-label="Restaurer ${lead.name}">
           ${icon.rotateCcw ? icon.rotateCcw() : ""}<span>Restaurer</span>
         </button>
@@ -6295,10 +6544,11 @@ function renderArchiveRow(lead) {
 
 /* v0.18.14 (ADR-0027) — Corbeille view. The Corbeille is to deleted leads what
    Archives is to archived: the ONE surface that lists isDeleted(lead). It MIRRORS
-   renderArchives — same .leads-table-card chrome + .archives-* row styling, no new
-   table CSS — differing only in: the title/sub copy, the date column ("Supprimé le"
-   / lead.deletedAt), the filter (isDeleted), the empty-state copy, and TWO row
-   actions (Restaurer → active; Supprimer définitivement → the only hard delete). */
+   renderArchives — same .leads-table-card chrome + shared .data-* table styling
+   (v0.18.15, item I), no new table CSS — differing only in: the title/sub copy,
+   the date column ("Supprimé le" / lead.deletedAt), the filter (isDeleted), the
+   empty-state copy, and TWO row actions (Restaurer → active; Supprimer
+   définitivement → the only hard delete). */
 function renderCorbeille() {
   const deleted = state.leads
     .filter(l => l.type === "buyer" && isDeleted(l))
@@ -6310,18 +6560,17 @@ function renderCorbeille() {
          <div class="archives-empty-body">Les leads que vous supprimez depuis la liste ou la fiche arrivent ici. Vous pouvez les restaurer, ou les supprimer définitivement.</div>
        </div>`
     : `
-      <div class="archives-head" role="row">
-        <div class="archives-col archives-col--nom">Nom</div>
-        <div class="archives-col archives-col--secteur">Secteur recherché</div>
-        <div class="archives-col archives-col--date">Supprimé le</div>
-        <div class="archives-col archives-col--action"></div>
+      <div class="data-table-head" role="row">
+        <div class="data-col data-col--nom">Nom</div>
+        <div class="data-col data-col--date">Supprimé le</div>
+        <div class="data-col data-col--action"></div>
       </div>
-      <div class="archives-list" role="rowgroup">
+      <div role="rowgroup">
         ${deleted.map(renderCorbeilleRow).join("")}
       </div>`;
 
   return `
-    <div class="archives">
+    <div>
       <div class="archives-intro">
         <div class="archives-title">Corbeille</div>
         <div class="archives-sub">${deleted.length} lead${deleted.length === 1 ? "" : "s"} supprimé${deleted.length === 1 ? "" : "s"} · récupérables ou à supprimer définitivement</div>
@@ -6334,14 +6583,13 @@ function renderCorbeille() {
 
 function renderCorbeilleRow(lead) {
   return `
-    <div class="archives-row" role="row">
-      <div class="archives-col archives-col--nom">
+    <div class="data-row" role="row">
+      <div class="data-col data-col--nom">
         ${renderAvatar(lead.initials, lead.tone, 34)}
-        <span class="archives-row-name">${lead.name}</span>
+        <span class="data-row-name">${lead.name}</span>
       </div>
-      <div class="archives-col archives-col--secteur">${lead.secteur || "—"}</div>
-      <div class="archives-col archives-col--date">${formatLeadDateHuman(lead.deletedAt)}</div>
-      <div class="archives-col archives-col--action archives-col--action-pair">
+      <div class="data-col data-col--date">${formatLeadDateHuman(lead.deletedAt)}</div>
+      <div class="data-col data-col--action data-col--action-pair">
         <button class="leads-table-btn" data-action="restore-from-corbeille" data-lead-id="${lead.id}" aria-label="Restaurer ${lead.name}">
           ${icon.rotateCcw ? icon.rotateCcw() : ""}<span>Restaurer</span>
         </button>
@@ -6611,7 +6859,6 @@ function renderDrawer() {
             return archive + del;
           })()}
         </div>
-        ${isMobile() ? `<div class="drawer-foot-legend">${renderIconLegend()}</div>` : ""}
       </div>` : ""}
     </aside>
   `;
@@ -7106,12 +7353,6 @@ document.addEventListener("click", (e) => {
       setState({ filters: { ...state.filters, score: next }, leadsPage: 1 });
       break;
     }
-    case "set-filter-date": {
-      // v0.15 — Date is a single preset. "all" clears it.
-      const d = target.getAttribute("data-date");
-      setState({ filters: { ...state.filters, date: d === "all" ? null : d }, leadsPage: 1 });
-      break;
-    }
     case "toggle-filter-budget": {
       // v0.18.11 (ADR-0009) — Budget is multi-select. Value is encodeURIComponent'd
       // in the attribute (it carries spaces/accents); decode before toggling.
@@ -7141,7 +7382,7 @@ document.addEventListener("click", (e) => {
     case "clear-filters": {
       // v0.15 — reset every filter dimension at once. v0.18.11 (ADR-0009) —
       // now also clears Budget · Secteur · Timing.
-      setState({ filterTab: "all", filters: { score: [], date: null, budget: [], secteur: [], timing: [] }, leadsPage: 1 });
+      setState({ filterTab: "all", filters: { score: [], budget: [], secteur: [], timing: [] }, leadsPage: 1 });
       break;
     }
     case "goto-page": {
@@ -7224,6 +7465,12 @@ document.addEventListener("change", (e) => {
     setState({ dashPeriode: sel.value || null });
   } else if (action === "set-dash-campagne") {
     setState({ dashCampagne: sel.value || null });
+  } else if (action === "set-leads-periode") {
+    // v0.18.15 (item C) — band date scoping. Reset to page 1: a date change can
+    // shrink the set (matches the leadsPage-reset discipline on every filter).
+    setState({ leadsPeriode: sel.value || null, leadsPage: 1 });
+  } else if (action === "set-leads-campagne") {
+    setState({ leadsCampagne: sel.value || null, leadsPage: 1 });
   }
 });
 
