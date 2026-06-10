@@ -1,17 +1,16 @@
 <!doctype html>
 <!--
-  Open House Leads — v0.18.21
-  Auth-seam ship (login.html only; index.html is version-string-only — APP_VERSION
-  + this header block are the sole edits to leads/index.html; the script below the
-  `-->` is byte-identical to v0.18.19 except APP_VERSION). This ship lands the auth
-  DESIGN (ADR-0029 — standard server-enforced baseline, not Fort Knox) + the auth
-  contract addendum to V1_5_BACKEND_BRIEF §1 + the login.html connection-ready seam
-  (a real login() handler with a commented/stubbed fetch to /api/auth/login).
-  NO backend built; NO /api/me boot gate or 401 interceptor added here (they would
-  break the demo and land with the backend cycle). ADR range → 0001–0029. This
-  header-comment block stays CAPPED to the current version entry only (Playbook §10
-  doesn't cover the in-file header). Full version history lives in CHANGELOG.md at
-  zip root.
+  Open House Leads — v0.18.22
+  updateLead write-wrapper ship (backend cycle, ship 1). Behavior-preserving
+  refactor, write side only: all 12 direct lead-field mutation sites (8 single-lead
+  + 4 bulk) now route through one updateLead(lead, changes) wrapper — the single
+  write seam where ship 2 drops repository.persist (ADR-0016). The wrapper does NOT
+  call setState/render; call sites keep their own render decisions (notes stays
+  setState-free for focus). Read side untouched (isActive/isArchived/isDeleted,
+  3563-65); purge-lead's hard delete is a list filter, not routed. No backend code.
+  ADR range → 0001–0030. This header-comment block stays CAPPED to the current
+  version entry only (Playbook §10 doesn't cover the in-file header). Full version
+  history lives in CHANGELOG.md at zip root.
 
   For prior version history, see CHANGELOG.md at zip root.
 -->
@@ -3067,7 +3066,7 @@
    placeholder chip and the "Envoyer un retour" email body so they can't
    drift. The HTML header comment, HANDOFF, CHANGELOG and zip name are still
    bumped separately (markup/docs, per Playbook §02 §1). */
-const APP_VERSION = "v0.18.21";
+const APP_VERSION = "v0.18.22";
 /* ── V1 helpers (v0.11.x table surgery) ─────────────────────────────
    daysAgoISO anchors dummy lead dates to runtime so the human date column
    (Aujourd'hui / Hier / Il y a N jours) always demos correctly. SCORE_CYCLE
@@ -3563,6 +3562,18 @@ function leadTimeline(lead) {
 function isArchived(lead) { return !!lead.archived && !lead.deleted; }
 function isDeleted(lead)  { return !!lead.deleted; }
 function isActive(lead)   { return !lead.archived && !lead.deleted; }
+
+/* Write-side companion to the read predicates above. The single seam every
+   lead-field mutation flows through (ADR-0016: parses on read, serialises on
+   write — one repository write contract). Takes and returns a domain lead
+   object; does NOT call setState/render (the call site owns its render
+   decision — notes deliberately mutates without re-render to keep focus). */
+function updateLead(lead, changes) {
+  if (!lead) return;
+  Object.assign(lead, changes);
+  // SHIP 2 (ADR-0016): repository.persist(lead) goes HERE — the single write seam.
+  return lead;
+}
 
 /* French formatter for the ISO createdAt field. Stored ISO (sortable),
    displayed French. When the backend lands and real timestamps come
@@ -6589,7 +6600,7 @@ document.addEventListener("click", (e) => {
       const lead = state.leads.find(l => l.id === id);
       if (lead) {
         const i = SCORE_CYCLE.indexOf(lead.score);
-        lead.score = SCORE_CYCLE[(i + 1) % SCORE_CYCLE.length];
+        updateLead(lead, { score: SCORE_CYCLE[(i + 1) % SCORE_CYCLE.length] });
         setState({ leadsPage: 1 });  // re-render with mutated lead
       }
       break;
@@ -6603,7 +6614,7 @@ document.addEventListener("click", (e) => {
       const score = target.getAttribute("data-score");
       const lead = state.leads.find(l => l.id === id);
       if (lead && SCORE_VALUES.includes(score)) {
-        lead.score = score;
+        updateLead(lead, { score });
         setState({ openScoreMenu: null, leadsPage: 1 });
       }
       break;
@@ -6640,7 +6651,7 @@ document.addEventListener("click", (e) => {
       const lead = state.leads.find(l => l.id === id);
       const valid = (state.agency.pipeline.buyer || []).some(s => s.id === status);
       if (lead && valid) {
-        lead.status = status;
+        updateLead(lead, { status });
         setState({ openStatusMenu: null, leadsPage: 1 });
       }
       break;
@@ -6700,7 +6711,7 @@ document.addEventListener("click", (e) => {
       const valid = (state.agency.pipeline.buyer || []).some(s => s.id === status);
       if (!valid || state.selectedLeadIds.length === 0) break;
       const ids = new Set(state.selectedLeadIds);
-      state.leads.forEach(l => { if (ids.has(l.id)) l.status = status; });
+      state.leads.forEach(l => { if (ids.has(l.id)) updateLead(l, { status }); });
       setState({ bulkMenu: null, leadsPage: 1 });
       break;
     }
@@ -6711,7 +6722,7 @@ document.addEventListener("click", (e) => {
       const score = target.getAttribute("data-score");
       if (!SCORE_VALUES.includes(score) || state.selectedLeadIds.length === 0) break;
       const ids = new Set(state.selectedLeadIds);
-      state.leads.forEach(l => { if (ids.has(l.id)) l.score = score; });
+      state.leads.forEach(l => { if (ids.has(l.id)) updateLead(l, { score }); });
       setState({ bulkMenu: null, leadsPage: 1 });
       break;
     }
@@ -6728,7 +6739,7 @@ document.addEventListener("click", (e) => {
       if (!window.confirm(msg)) break;
       const ids = new Set(state.selectedLeadIds);
       const now = new Date().toISOString();
-      state.leads.forEach(l => { if (ids.has(l.id)) { l.deleted = true; l.deletedAt = now; } });
+      state.leads.forEach(l => { if (ids.has(l.id)) updateLead(l, { deleted: true, deletedAt: now }); });
       setState({ selectedLeadIds: [], bulkMenu: null, leadsPage: 1 });
       break;
     }
@@ -6742,7 +6753,7 @@ document.addEventListener("click", (e) => {
       if (state.selectedLeadIds.length === 0) break;
       const ids = new Set(state.selectedLeadIds);
       const now = new Date().toISOString();
-      state.leads.forEach(l => { if (ids.has(l.id)) { l.archived = true; l.archivedAt = now; } });
+      state.leads.forEach(l => { if (ids.has(l.id)) updateLead(l, { archived: true, archivedAt: now }); });
       setState({ selectedLeadIds: [], bulkMenu: null, leadsPage: 1 });
       break;
     }
@@ -6768,8 +6779,7 @@ document.addEventListener("click", (e) => {
       const id = Number(target.getAttribute("data-lead-id"));
       const lead = state.leads.find(l => l.id === id);
       if (lead) {
-        lead.archived = true;
-        lead.archivedAt = new Date().toISOString();
+        updateLead(lead, { archived: true, archivedAt: new Date().toISOString() });
         setState({ drawer: null, selectedLeadIds: state.selectedLeadIds.filter(x => x !== id), leadsPage: 1 });
       }
       break;
@@ -6780,8 +6790,7 @@ document.addEventListener("click", (e) => {
       const id = Number(target.getAttribute("data-lead-id"));
       const lead = state.leads.find(l => l.id === id);
       if (lead) {
-        lead.archived = false;
-        lead.archivedAt = null;
+        updateLead(lead, { archived: false, archivedAt: null });
         setState({ leadsPage: 1 });
       }
       break;
@@ -6798,8 +6807,7 @@ document.addEventListener("click", (e) => {
       const lead = state.leads.find(l => l.id === id);
       if (lead) {
         if (!window.confirm("Supprimer ce lead ? Il sera déplacé vers la corbeille.")) break;
-        lead.deleted = true;
-        lead.deletedAt = new Date().toISOString();
+        updateLead(lead, { deleted: true, deletedAt: new Date().toISOString() });
         setState({ drawer: null, selectedLeadIds: state.selectedLeadIds.filter(x => x !== id), leadsPage: 1 });
       }
       break;
@@ -6812,8 +6820,7 @@ document.addEventListener("click", (e) => {
       const id = Number(target.getAttribute("data-lead-id"));
       const lead = state.leads.find(l => l.id === id);
       if (lead) {
-        lead.deleted = false;
-        lead.deletedAt = null;
+        updateLead(lead, { deleted: false, deletedAt: null });
         setState({ drawer: null, leadsPage: 1 });
       }
       break;
@@ -6910,7 +6917,7 @@ document.addEventListener("input", (e) => {
   if (notesEl) {
     const id = Number(notesEl.getAttribute("data-notes-lead-id"));
     const lead = state.leads.find(l => l.id === id);
-    if (lead) lead.notes = notesEl.value;
+    if (lead) updateLead(lead, { notes: notesEl.value });
     return;
   }
 
